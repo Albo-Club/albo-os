@@ -16,7 +16,12 @@ import { internalMutation, mutation, query } from './_generated/server'
 import { RESEND_FROM, resend } from './email'
 import { REPORT_EMAIL_MAX_CARDS, weeklyDigestEmail } from './emailTemplates'
 import { requireAppUser, requireOrgMember } from './lib/auth'
-import { logDealEvent } from './lib/companyEvents'
+import {
+  journalRulePatch,
+  logDealEvent,
+  logRuleEvent,
+  userActor,
+} from './lib/companyEvents'
 import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
 import { companyLogoUrl } from './lib/domain'
@@ -170,11 +175,12 @@ export async function insertRule(
     endDate?: number
     active?: boolean
   },
+  actor: CompanyEventActor,
 ): Promise<Id<'forecastRules'>> {
   const interval = args.interval ?? 1
   assertValidRuleFields({ ...args, interval })
   if (args.dealId) await assertDealInOrg(ctx, args.orgId, args.dealId)
-  return await ctx.db.insert('forecastRules', {
+  const id = await ctx.db.insert('forecastRules', {
     orgId: args.orgId,
     label: args.label,
     amountCents: args.amountCents,
@@ -189,6 +195,13 @@ export async function insertRule(
     active: args.active ?? true,
     sourceType: 'manual',
   })
+  await logRuleEvent(ctx, args, actor, {
+    kind: 'rule_created',
+    label: args.label,
+    amountCents: args.amountCents,
+    frequency: args.frequency,
+  })
+  return id
 }
 
 /** Creates a recurring rule (e.g. monthly SCI rent) in an org. */
@@ -208,8 +221,8 @@ export const createRule = mutation({
     active: v.optional(v.boolean()), // default true
   },
   handler: async (ctx, args) => {
-    await requireOrgMember(ctx, args.orgId)
-    return await insertRule(ctx, args)
+    const { user } = await requireOrgMember(ctx, args.orgId)
+    return await insertRule(ctx, args, userActor(user._id))
   },
 })
 
@@ -237,7 +250,7 @@ export const deleteRule = mutation({
   handler: async (ctx, { ruleId }) => {
     const rule = await ctx.db.get('forecastRules', ruleId)
     if (!rule) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, rule.orgId)
+    const { user } = await requireOrgMember(ctx, rule.orgId)
 
     const entries = await ctx.db
       .query('forecastEntries')
@@ -251,6 +264,10 @@ export const deleteRule = mutation({
       }
     }
     await ctx.db.delete('forecastRules', ruleId)
+    await logRuleEvent(ctx, rule, userActor(user._id), {
+      kind: 'rule_deleted',
+      label: rule.label,
+    })
     return { entriesRemoved }
   },
 })
@@ -282,19 +299,21 @@ export const updateRule = mutation({
   handler: async (ctx, { ruleId, patch }) => {
     const rule = await ctx.db.get('forecastRules', ruleId)
     if (!rule) throw new ConvexError('not_found')
-    await requireOrgMember(ctx, rule.orgId)
+    const { user } = await requireOrgMember(ctx, rule.orgId)
     // null (clear) validates as "no category"; a set category is checked
     // against the (possibly patched) direction.
     const { category: rawCategory, dealId: rawDealId, ...rest } = patch
     const category = rawCategory === null ? undefined : rawCategory
     assertValidRuleFields({ ...rule, ...rest, category })
     if (rawDealId) await assertDealInOrg(ctx, rule.orgId, rawDealId)
-    await ctx.db.patch('forecastRules', ruleId, {
+    const effective = {
       ...rest,
       // Patching `category: undefined` removes the field (clear).
       ...(rawCategory !== undefined ? { category } : {}),
       ...(rawDealId !== undefined ? { dealId: rawDealId ?? undefined } : {}),
-    })
+    }
+    await ctx.db.patch('forecastRules', ruleId, effective)
+    await journalRulePatch(ctx, rule, effective, userActor(user._id))
     return null
   },
 })

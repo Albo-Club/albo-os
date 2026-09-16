@@ -3,7 +3,7 @@
  * tables already remember, so the « Activité » section of a company sheet is
  * not empty on day one.
  *
- * Nine sources — nothing else is reconstructible:
+ * Eleven sources — nothing else is reconstructible:
  *
  * - `deals`            → `created` at `_creationTime`; by « Attio » when the
  *                        row carries an `attioDealId` (the sync or the Attio
@@ -42,6 +42,11 @@
  *                        `capturedAt`.
  * - `dealProjections`  → one `projection_replaced` per (deal, version) at
  *                        the newest line's `_creationTime`, no author.
+ * - `forecastRules` tied to a deal → `rule_created` at `_creationTime`, no
+ *                        author (a rule without a deal has no sheet).
+ * - `todos` tied to a company → `todo_created` by `createdBy` at
+ *                        `createdAt`, and `todo_status` done at `doneAt`
+ *                        when finished, no author.
  *
  * Only what happened IN Albo OS is reconstructed. The Airtable import is a
  * bulk copy of a history that predates the app, so a row it created (deal or
@@ -70,6 +75,8 @@
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"companies"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"kpis"}'
  *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"projections"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"rules"}'
+ *   pnpm exec convex run --prod migrations/backfillCompanyEvents:apply '{"source":"todos"}'
  */
 import { v } from 'convex/values'
 import { internal } from '../_generated/api'
@@ -88,6 +95,8 @@ const sourceValidator = v.union(
   v.literal('companies'),
   v.literal('kpis'),
   v.literal('projections'),
+  v.literal('rules'),
+  v.literal('todos'),
 )
 const BATCH = 500
 /** Report rows carry the whole mail text (`rawContent`, `cleanedHtml`) and
@@ -314,6 +323,15 @@ export const dryRun = internalQuery({
         (p) => `${p.dealId}:${p.version}`,
       ),
     ).size
+    const rules = (await ctx.db.query('forecastRules').collect()).filter(
+      (r) => r.dealId,
+    ).length
+    const allTodos = (await ctx.db.query('todos').collect()).filter(
+      (t) => t.companyId,
+    )
+    const todos =
+      allTodos.length +
+      allTodos.filter((t) => t.status === 'done' && t.doneAt).length
     // `companyReports` is deliberately NOT counted: its rows carry the full
     // mail text, and reading them all in one function exceeds the read
     // limit (that is also why `apply` pages them by REPORT_BATCH). Watch
@@ -331,6 +349,8 @@ export const dryRun = internalQuery({
         companies: companies + archived,
         kpis,
         projections,
+        rules,
+        todos,
       },
       unattributable,
       already,
@@ -570,6 +590,55 @@ export const apply = internalMutation({
         }
         continueCursor = ''
         isDone = true
+        break
+      }
+      case 'rules': {
+        const page = await ctx.db.query('forecastRules').paginate(opts)
+        for (const rule of page.page) {
+          if (!rule.dealId) continue
+          const deal = await ctx.db.get('deals', rule.dealId)
+          written += await upsert(
+            ctx,
+            `rule:${rule._id}`,
+            deal,
+            rule._creationTime,
+            UNKNOWN,
+            {
+              kind: 'rule_created',
+              label: rule.label,
+              amountCents: rule.amountCents,
+              frequency: rule.frequency,
+            },
+          )
+        }
+        ;({ continueCursor, isDone } = page)
+        break
+      }
+      case 'todos': {
+        const page = await ctx.db.query('todos').paginate(opts)
+        for (const todo of page.page) {
+          if (!todo.companyId) continue
+          const target = { orgId: todo.orgId, companyId: todo.companyId }
+          written += await upsertOn(
+            ctx,
+            `todo:${todo._id}`,
+            target,
+            todo.createdAt,
+            { kind: 'user', userId: todo.createdBy },
+            { kind: 'todo_created', title: todo.title },
+          )
+          if (todo.status === 'done' && todo.doneAt) {
+            written += await upsertOn(
+              ctx,
+              `tododone:${todo._id}`,
+              target,
+              todo.doneAt,
+              UNKNOWN,
+              { kind: 'todo_status', title: todo.title, status: 'done' },
+            )
+          }
+        }
+        ;({ continueCursor, isDone } = page)
         break
       }
     }

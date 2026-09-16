@@ -406,11 +406,29 @@
       "kpi_added": "a ajouté le KPI {{metric}} au {{date}} · {{value}}",
       "kpi_removed": "a supprimé le KPI {{metric}} au {{date}}",
       "projection_replaced_one": "a remplacé le BP {{version}} de {{deal}} ({{count}} ligne)",
-      "projection_replaced_other": "a remplacé le BP {{version}} de {{deal}} ({{count}} lignes)"
+      "projection_replaced_other": "a remplacé le BP {{version}} de {{deal}} ({{count}} lignes)",
+      "rule_created": "a ajouté la règle « {{label}} » ({{amount}} {{frequency}}) sur {{deal}}",
+      "rule_updated": "a modifié la règle « {{label}} » de {{deal}}",
+      "rule_activated": "a activé la règle « {{label}} » de {{deal}}",
+      "rule_deactivated": "a désactivé la règle « {{label}} » de {{deal}}",
+      "rule_linked": "a rattaché la règle « {{label}} » à {{deal}}",
+      "rule_unlinked": "a détaché la règle « {{label}} » de {{deal}}",
+      "rule_deleted": "a supprimé la règle « {{label}} » de {{deal}}",
+      "todo_created": "a créé la to-do « {{title}} »",
+      "todo_status_open": "a rouvert la to-do « {{title}} »",
+      "todo_status_in_progress": "a passé la to-do « {{title}} » en cours",
+      "todo_status_done": "a terminé la to-do « {{title}} »",
+      "todo_removed": "a supprimé la to-do « {{title}} »"
     },
     "bpVersion": {
       "initial": "initial",
       "revised": "révisé"
+    },
+    "freq": {
+      "weekly": "par semaine",
+      "monthly": "par mois",
+      "quarterly": "par trimestre",
+      "yearly": "par an"
     }
   },
   "edit": {

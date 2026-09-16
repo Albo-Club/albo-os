@@ -14,6 +14,9 @@
  * - The company itself: creation, identity (a rename in clear), people, the
  *   Attio and Parallel links, archiving; hand-entered KPIs; the business
  *   plan. Automatic writes on the row stay out (cf. tests/journalGuards).
+ * - A forecast rule tied to a deal (created, edited, toggled, moved,
+ *   deleted) journals on that deal; one without a deal writes nothing. A
+ *   to-do tied to a company journals on it; one without stays silent.
  */
 import { describe, expect, test } from 'vitest'
 import { api, internal } from './_generated/api'
@@ -955,5 +958,232 @@ describe('companyEvents: the company itself, KPIs and the business plan', () => 
     ])
     expect(rows[0].at).toBe(archivedAt)
     expect(rows[3].actor.kind).toBe('user')
+  })
+})
+
+describe('companyEvents: forecast rules on their deal, to-dos on their company', () => {
+  const ruleArgs = {
+    label: 'Coupon',
+    amountCents: 500_000,
+    direction: 'in' as const,
+    frequency: 'quarterly' as const,
+    anchorDay: 15,
+    startDate: Date.UTC(2026, 0, 15),
+  }
+
+  test('a rule created, edited, toggled, moved to another deal, deleted', async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-rules')
+    const other = await createPortfolioCompany(t, org.orgId, 'Other')
+    const otherDealId = await user.as.mutation(api.deals.create, {
+      orgId: org.orgId,
+      investorCompanyId: org.rootCompanyId,
+      targetCompanyId: other,
+      instrumentKind: 'share',
+      committedAmount: 50_000,
+    })
+    const ruleId = await user.as.mutation(api.forecasts.createRule, {
+      orgId: org.orgId,
+      dealId,
+      ...ruleArgs,
+    })
+    await user.as.mutation(api.forecasts.updateRule, {
+      ruleId,
+      patch: { amountCents: 600_000 },
+    })
+    // Same values again: not a gesture.
+    await user.as.mutation(api.forecasts.updateRule, {
+      ruleId,
+      patch: { amountCents: 600_000 },
+    })
+    await user.as.mutation(api.forecasts.updateRule, {
+      ruleId,
+      patch: { active: false },
+    })
+    await user.as.mutation(api.forecasts.updateRule, {
+      ruleId,
+      patch: { dealId: otherDealId },
+    })
+    await user.as.mutation(api.forecasts.deleteRule, { ruleId })
+    // A rule with no deal has no sheet: nothing is written anywhere.
+    await user.as.mutation(api.forecasts.createRule, {
+      orgId: org.orgId,
+      ...ruleArgs,
+      label: 'Loyer',
+    })
+
+    const onTarget = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: target,
+      })
+    ).filter((r) => r.event.kind !== 'created')
+    expect(onTarget.map((r) => r.event)).toEqual([
+      { kind: 'rule_unlinked', label: 'Coupon' },
+      { kind: 'rule_toggled', label: 'Coupon', active: false },
+      { kind: 'rule_updated', label: 'Coupon' },
+      {
+        kind: 'rule_created',
+        label: 'Coupon',
+        amountCents: 500_000,
+        frequency: 'quarterly',
+      },
+    ])
+    const onOther = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: other,
+      })
+    ).filter((r) => r.event.kind !== 'created')
+    expect(onOther.map((r) => r.event)).toEqual([
+      { kind: 'rule_deleted', label: 'Coupon' },
+      { kind: 'rule_linked', label: 'Coupon' },
+    ])
+    expect(onOther[0].deal?._id).toBe(otherDealId)
+  })
+
+  test("a rule written through the agent is the user's, viaAgent", async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-rules-agent')
+    const { _id: ruleId } = await t.mutation(
+      internal.agentToolsForecasts.createRuleInternal,
+      { orgId: org.orgId, actorUserId: user.userId, dealId, ...ruleArgs },
+    )
+    await t.mutation(internal.agentToolsForecasts.updateRuleInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      ruleId,
+      label: 'Coupon 2',
+    })
+    await t.mutation(internal.agentToolsForecasts.deleteRuleInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      ruleId,
+    })
+    const rows = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: target,
+      })
+    ).filter((r) => r.event.kind !== 'created')
+    expect(rows.map((r) => r.event.kind)).toEqual([
+      'rule_deleted',
+      'rule_updated',
+      'rule_created',
+    ])
+    expect(rows.every((r) => r.actor.kind === 'user' && r.actor.viaAgent)).toBe(
+      true,
+    )
+  })
+
+  test('a to-do tied to a company: created, moved, done, removed', async () => {
+    const { user, org, target } = await orgSetup('org-todos')
+    const taskId = await user.as.mutation(api.todo.createTask, {
+      orgId: org.orgId,
+      title: 'Relancer le founder',
+      companyId: target,
+    })
+    await user.as.mutation(api.todo.setTaskStatus, {
+      taskId,
+      status: 'in_progress',
+    })
+    // Same status again: not a gesture.
+    await user.as.mutation(api.todo.setTaskStatus, {
+      taskId,
+      status: 'in_progress',
+    })
+    await user.as.mutation(api.todo.setTaskStatus, { taskId, status: 'done' })
+    await user.as.mutation(api.todo.removeTask, { taskId })
+    // Without a company: nowhere to show, nothing written.
+    const loose = await user.as.mutation(api.todo.createTask, {
+      orgId: org.orgId,
+      title: 'Appeler la banque',
+    })
+    await user.as.mutation(api.todo.setTaskStatus, {
+      taskId: loose,
+      status: 'done',
+    })
+
+    const rows = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: target,
+      })
+    ).filter((r) => r.deal === null)
+    expect(rows.map((r) => r.event)).toEqual([
+      { kind: 'todo_removed', title: 'Relancer le founder' },
+      { kind: 'todo_status', title: 'Relancer le founder', status: 'done' },
+      {
+        kind: 'todo_status',
+        title: 'Relancer le founder',
+        status: 'in_progress',
+      },
+      { kind: 'todo_created', title: 'Relancer le founder' },
+    ])
+  })
+
+  test('the backfill rebuilds deal rules and company to-dos once', async () => {
+    const { t, user, org, target, dealId } = await orgSetup('org-backfill-rt')
+    const doneAt = Date.now() + 5_000
+    await t.run(async (ctx) => {
+      await ctx.db.insert('forecastRules', {
+        orgId: org.orgId,
+        dealId,
+        interval: 1,
+        active: true,
+        sourceType: 'manual',
+        ...ruleArgs,
+      })
+      // No deal: no sheet, skipped.
+      await ctx.db.insert('forecastRules', {
+        orgId: org.orgId,
+        interval: 1,
+        active: true,
+        sourceType: 'manual',
+        ...ruleArgs,
+        label: 'Loyer',
+      })
+      await ctx.db.insert('todos', {
+        orgId: org.orgId,
+        title: 'Relancer',
+        status: 'done',
+        createdBy: user.userId,
+        createdAt: 10,
+        doneAt,
+        companyId: target,
+      })
+      // No company: skipped.
+      await ctx.db.insert('todos', {
+        orgId: org.orgId,
+        title: 'Banque',
+        status: 'open',
+        createdBy: user.userId,
+        createdAt: 10,
+      })
+      const rows = await ctx.db.query('companyEvents').collect()
+      for (const r of rows) await ctx.db.delete('companyEvents', r._id)
+    })
+    const run = async () => {
+      let written = 0
+      for (const source of ['rules', 'todos'] as const) {
+        const r = await t.mutation(
+          internal.migrations.backfillCompanyEvents.apply,
+          { source, chain: false },
+        )
+        written += r.written
+      }
+      return written
+    }
+    expect(await run()).toBe(3)
+    expect(await run()).toBe(0)
+
+    const rows = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    expect(rows.map((r) => r.event)).toEqual([
+      { kind: 'todo_status', title: 'Relancer', status: 'done' },
+      {
+        kind: 'rule_created',
+        label: 'Coupon',
+        amountCents: 500_000,
+        frequency: 'quarterly',
+      },
+      { kind: 'todo_created', title: 'Relancer' },
+    ])
+    expect(rows[2].actor.kind).toBe('user')
   })
 })
