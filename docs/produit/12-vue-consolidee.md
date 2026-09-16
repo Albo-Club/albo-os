@@ -36,6 +36,15 @@ Le circuit complet — ce que l'application fait seule, les actions
 disponibles sur une ligne et ce que chacune déclenche — est décrit dans
 [Reports par email](17-reports-par-email.md), qui fait foi.
 
+Comme le reste de la page, la boîte s'arrête à vos organisations. Une ligne
+vous est montrée quand elle est rattachée à une participation d'une de vos
+organisations, ou quand c'est **vous** qui avez transféré le mail — c'est ce
+second cas qui vous montre vos propres transferts avant tout rattachement, et
+ceux qui finissent en quarantaine. Un mail que rien ne rattache et dont
+l'expéditeur n'est pas reconnu (indésirable, inconnu écrivant à l'adresse)
+n'appartient à personne : il n'est visible que des administrateurs de
+l'application, qui en gardent le tri.
+
 ## Points d'attention
 
 - Une nouvelle organisation apparaît ici **automatiquement** dès que vous en
@@ -44,7 +53,12 @@ disponibles sur une ligne et ce que chacune déclenche — est décrit dans
   aucun bouton de création ni d'édition, l'édition se fait dans l'organisation
   concernée. La boîte des rapports entrants fait exception — c'est une file de
   travail, et ses actions (rattacher, retraiter, rejeter, supprimer) s'exercent
-  bien depuis ici.
+  bien depuis ici. Elles s'arrêtent aux lignes qui vous sont montrées : une
+  ligne d'une organisation dont vous n'êtes pas membre est refusée.
+- Rattacher une participation à la main étend le rattachement aux autres
+  entités qui représentent la même société — dans **vos** organisations
+  uniquement. C'est ce qui sert une boîte détenue deux fois sous deux noms,
+  sans jamais ranger votre rapport chez quelqu'un d'autre.
 
 ## Pages liées
 

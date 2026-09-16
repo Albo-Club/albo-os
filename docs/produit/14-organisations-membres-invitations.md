@@ -2,10 +2,25 @@
 
 ## Créer une organisation
 
-À la première connexion sans organisation, l'**onboarding** propose d'en
-créer une : un nom et un slug (l'identifiant dans l'URL, vérifié en direct :
+Deux chemins, le même écran : à la première connexion sans organisation,
+l'**onboarding** s'ouvre tout seul ; ensuite, l'entrée **« Créer une
+organisation »** en bas du sélecteur d'organisation (en haut de la barre
+latérale) y ramène à tout moment.
+
+On y saisit un nom et un slug (l'identifiant dans l'URL, vérifié en direct :
 disponible, réservé ou déjà pris). Le créateur devient **owner**. Le slug ne
 se change plus ensuite.
+
+La création pose aussi la **société de l'organisation** elle-même, nommée
+d'après elle : c'est l'entité qui investit et qui détient les comptes
+bancaires, donc sans elle rien ne serait saisissable. Elle apparaît dans les
+participations comme entité du groupe ; son identité (SIREN, forme juridique,
+siège) se complète ensuite sur sa fiche. Une nouvelle organisation est donc
+utilisable immédiatement : premier deal, premier compte, sans autre étape.
+
+Rappel du cadre : **une société juridique = une organisation**, et les
+organisations sont à plat — aucune n'est « dans » une autre (voir
+[Vue d'ensemble](01-vue-densemble.md)).
 
 ## Les rôles
 

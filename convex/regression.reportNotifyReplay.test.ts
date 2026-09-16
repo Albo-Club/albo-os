@@ -32,6 +32,9 @@ async function createEmail(
     status?: 'received' | 'needs_review' | 'processed'
     notifiedAt?: number
     notifiedKind?: 'success' | 'failure' | 'quarantine'
+    /** Attribution, as `ingest` sets it for a member's address — it is what
+     *  puts the row in that member's queue while nothing is matched. */
+    senderUserId?: Id<'users'>
   } = {},
 ): Promise<Id<'inboundEmails'>> {
   return await t.run(async (ctx) => {
@@ -39,6 +42,7 @@ async function createEmail(
       agentmailInboxId: 'inbox-test',
       agentmailMessageId: 'msg-corma-july',
       fromEmail: 'benjamin@test.dev',
+      senderUserId: overrides.senderUserId,
       toEmails: ['reports@test.dev'],
       ccEmails: [],
       subject: 'Fwd: Corma July 2026 investor update',
@@ -147,7 +151,11 @@ describe('replaying a row from the queue keeps the guard', () => {
   test('"Retraiter" does not release the notification slot', async () => {
     const { t, user } = await setup()
     const notifiedAt = Date.now()
-    const id = await createEmail(t, { notifiedAt, notifiedKind: 'failure' })
+    const id = await createEmail(t, {
+      notifiedAt,
+      notifiedKind: 'failure',
+      senderUserId: user.userId,
+    })
 
     await user.as.mutation(api.reportInbox.reprocess, { inboundEmailId: id })
 

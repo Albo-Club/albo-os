@@ -23,6 +23,81 @@ bas de page.
 
 ---
 
+## v1.236.0 — 16/09/2026 à 11:47 — Créer une organisation depuis l'app, et une file de rapports cloisonnée
+
+Le sélecteur d'organisation, en haut de la barre latérale, gagne une entrée
+**« Créer une organisation »** tout en bas. L'écran de création existait déjà
+mais ne s'ouvrait qu'à la première connexion, quand on n'avait encore aucune
+organisation : il fallait connaître son adresse pour y revenir.
+
+**Une organisation créée est utilisable tout de suite.** Elle arrive
+désormais avec sa propre société — celle qui investit et qui détient les
+comptes bancaires. Sans elle, une organisation créée depuis l'app était vide
+au point d'être inerte : ni deal ni compte n'était saisissable, faute de
+quelqu'un à proposer comme investisseur. Son identité (SIREN, forme
+juridique, siège) se complète ensuite sur sa fiche.
+
+**La boîte des rapports entrants s'arrête maintenant à vos organisations.**
+Elle affichait les cent derniers mails reçus, toutes organisations
+confondues, à n'importe quel membre — et ses boutons (retraiter, rejeter,
+supprimer) acceptaient n'importe quelle ligne. Désormais une ligne vous est
+montrée quand elle est rattachée à une participation d'une de vos
+organisations, ou quand c'est vous qui avez transféré le mail — ce second cas
+étant ce qui vous montre vos propres transferts avant tout rattachement, et
+ceux qui finissent en quarantaine. Les mails que rien ne rattache et dont
+l'expéditeur n'est pas reconnu (indésirables, inconnus écrivant à l'adresse)
+n'appartiennent à personne : ils ne sont visibles que des administrateurs de
+l'application, qui en gardent le tri.
+
+Dans la même logique, deux gestes du circuit se resserrent : l'identification
+automatique compare le mail aux participations de **celui qui l'a transféré**
+— un fondateur qui écrit directement, lui, continue d'être classé sur tout le
+portefeuille, faute de quelqu'un à qui rattacher son mail ; et le
+rattachement manuel n'étend plus la pose aux sociétés jumelles que dans **vos**
+organisations. Enfin, le point hebdo du lundi ne titre plus avec le nom d'une
+société dont vous n'êtes pas membre.
+
+**Ce que ça change pour vous deux : le bouton, et rien d'autre.** Étant
+membres de toutes les organisations, vous voyez la même file, les mêmes
+lignes, dans le même ordre.
+
+> **🔧 Notes techniques**
+>
+> - `organizations.create` pose désormais la company `group_root` de l'org
+>   (nom = nom de l'org) et journalise `company_created` via `logCompanyEvent`
+>   — obligatoire, `companies` est dans le `JOURNALED` de
+>   `tests/journalGuards.test.ts`. Le reste de l'identité se saisit ensuite.
+>   Couvert par `convex/regression.orgCreate.test.ts` (root posé, deal
+>   possible avec lui comme investisseur, événement journalisé).
+> - Entrée « Créer une organisation » dans `OrgSwitcher.tsx` →
+>   `/app/onboarding` ; clé `nav:orgSwitcher.create` (en/fr). Le titre de
+>   l'écran passe de « Créez votre première organisation » à « Créer une
+>   organisation », maintenant qu'on peut y revenir.
+> - `reportInbox.ts` : la frontière `requireAnyMember` (« membre de ≥ 1 org »)
+>   ne cloisonnait rien. Nouveau test par ligne — `inPerimeter` : une entité
+>   rattachée dans une de mes orgs, ou un expéditeur qui partage une org avec
+>   moi ; ligne sans l'un ni l'autre → `users.superAdmin`. Appliqué à `list`
+>   (filtrage après le `take(100)`, volontairement — les lignes portent le
+>   corps et le texte extrait) et, via `requireRowInPerimeter`, à `reprocess`,
+>   `storeAnyway`, `reject`, `deleteEmail`, **avant** leurs garde-fous d'état.
+>   `assignCompany` accepte en plus les lignes non attribuées, sinon plus
+>   personne ne pourrait les rattacher.
+> - `sameParticipation` prend les orgs de l'appelant au lieu de lire toutes
+>   les orgs : contrôler la destination (`requireOrgMember`) ne contrôlait pas
+>   l'essaimage par domaine partagé.
+> - `reportIdentify.listCandidates` prend un `senderUserId` optionnel →
+>   portefeuille des orgs du transféreur. Absent (fondateur écrivant à
+>   l'adresse ouverte) → tout le portefeuille, sinon on supprimait le
+>   classement automatique de ces mails (cf.
+>   `regression.reportSenders.test.ts`).
+> - `forecasts.sendWeeklyDigest` : le titre du mail ne lit le nom de l'org
+>   tête de famille que si le destinataire en est membre — `familyOf` range
+>   tout ce qui n'est pas Albo sous CALTE.
+> - Filet : `convex/regression.reportTenancy.test.ts` (8 cas). Deux fixtures
+>   existantes (`reportDetach`, `reportNotifyReplay`) rendues fidèles à ce que
+>   `ingest` écrit — elles omettaient `senderUserId`. Le pourquoi de la
+>   frontière est dans `KNOWN_ISSUES.md` § « Membre d'au moins une org ».
+
 ## v1.235.0 — 16/09/2026 à 09:49 — La carte « Adresses d'envoi des reports » disparaît
 
 Réglages → Membres perd sa dernière carte. Elle permettait de déclarer une

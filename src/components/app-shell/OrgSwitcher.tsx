@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router'
 import { useConvexMutation } from '@convex-dev/react-query'
-import { Check, ChevronsUpDown, Layers } from 'lucide-react'
+import { Check, ChevronsUpDown, Layers, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../convex/_generated/api'
@@ -138,6 +138,16 @@ export function OrgSwitcher({
                 {t('nav:orgSwitcher.allOrganizations')}
               </span>
               {currentSlug === 'all' && <Check className="ml-auto size-4" />}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onSelect={() => navigate({ to: '/app/onboarding' })}
+              className="gap-2"
+            >
+              <div className="bg-background flex size-6 items-center justify-center rounded border">
+                <Plus className="size-4" />
+              </div>
+              <span>{t('nav:orgSwitcher.create')}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
