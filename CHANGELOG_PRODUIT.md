@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.234.0 — 16/09/2026 à 09:49 — La carte « Adresses d'envoi des reports » disparaît
+
+Réglages → Membres perd sa dernière carte. Elle permettait de déclarer une
+adresse secondaire — un Gmail perso, une adresse dans une autre boîte —
+pour être reconnu comme l'auteur d'un report transféré et recevoir l'accusé
+complet plutôt que le silence réservé aux inconnus.
+
+Elle n'a jamais servi, et elle ne pouvait pas servir : **toutes les adresses
+depuis lesquelles vous transférez sont déjà des comptes membres**. Or la
+carte refusait par construction une adresse déjà rattachée à un compte. Elle
+ne pouvait donc accueillir que des adresses que personne n'utilise, et elle
+est restée vide depuis sa mise en ligne fin août.
+
+**Rien ne change à l'usage.** Un report transféré depuis n'importe laquelle
+de vos adresses continue d'être rangé et de vous valoir l'accusé complet,
+puisque chacune est un compte. Un report envoyé par quelqu'un d'extérieur
+continue d'être rangé si son contenu le permet, en silence. Le seul cas
+perdu est théorique : transférer depuis une adresse qu'on ne veut pas
+promouvoir en compte.
+
+Aucun compte, aucune adresse et aucun droit n'ont été touchés.
+
+> **🔧 Notes techniques**
+>
+> - Retrait de `SendingAddressesCard.tsx`, de son montage dans
+>   `settings/members.tsx`, du bloc i18n `sendingAddresses` (fr + en) et des
+>   trois fonctions `organizations.{list,add,remove}MemberAlias`.
+> - `lib/reportSenders.ts:resolveMemberByEmail` ne lit plus que
+>   `users.by_email` : le repli sur `userEmailAliases` disparaît. Comportement
+>   identique en pratique — les adresses concernées sont des lignes `users`.
+> - La table `userEmailAliases` reste **déclarée mais inerte** au schéma,
+>   écrite et lue par rien. Même stance que la table legacy `forecasts` et les
+>   tables Gmail : la retirer demande de purger la prod d'abord, puis de
+>   resserrer. Le commentaire du schéma dit pourquoi.
+> - `convex/regression.reportSenders.test.ts` recentré sur ce qui reste : une
+>   adresse de compte résout vers son membre, une adresse inconnue vers
+>   personne, et l'analyse tourne quel que soit l'expéditeur. Les cas alias
+>   partent avec les mutations. `tests/reportSenders.test.ts` (liste noire du
+>   groupe de transfert) est inchangé.
+> - Docs : `TESTING.md` (R33d/R33e retirés, prose de la brique reports),
+>   `KNOWN_ISSUES.md` § « Adresses d'envoi des reports : une carte retirée, sa
+>   table inerte », `docs/produit/14` (section retirée) et `17` (paragraphe
+>   réécrit).
+
+---
+
 ## v1.233.0 — 14/09/2026 à 21:39 — Le journal de la fiche société suit la fiche elle-même, ses KPIs et son BP
 
 La section **Activité** d'une fiche société raconte maintenant aussi ce qui

@@ -35,14 +35,12 @@ ne part donc **jamais** vers quelqu'un qui n'est pas membre. Un inconnu dont
 le report se range correctement n'en saura rien — il ne reçoit rien du tout,
 et l'adresse ne révèle même pas qu'elle existe.
 
-**Pour recevoir l'accusé depuis une autre adresse que celle de ton compte**
-— ton Gmail perso, ton adresse dans une autre boîte — déclare-la dans
-[Réglages → Membres](14-organisations-membres-invitations.md), carte
-« Adresses d'envoi des reports ». Sans ça, un report transféré depuis cette
-adresse se rangera très bien, mais tu n'auras pas de retour : le circuit ne
-sait pas que c'est toi. Une adresse déclarée n'ouvre aucun droit et ne
-permet pas de se connecter — elle sert uniquement à te reconnaître comme
-l'auteur d'un transfert.
+**Transférer depuis une autre adresse que celle de ton compte** — ton Gmail
+perso, ton adresse dans une autre boîte — range le report très bien, mais ne
+te vaut aucun retour : le circuit ne sait pas que c'est toi. Pour recevoir
+l'accusé depuis cette adresse, il faut qu'elle soit
+[un compte membre](14-organisations-membres-invitations.md) — c'est le cas
+de toutes les adresses depuis lesquelles on transfère aujourd'hui.
 
 ### 2. Identification de la participation
 

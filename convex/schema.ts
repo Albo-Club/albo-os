@@ -571,14 +571,17 @@ export default defineSchema({
   }).index('by_user', ['userId']),
 
   /**
-   * Secondary addresses a member forwards reports from — a personal Gmail, a
-   * work address at another company. NOT a login: an alias only attributes an
-   * INBOUND email to a member, so the report pipeline can reply to them with
-   * the full confirmation instead of staying silent.
+   * INERT — declared, written by nothing, read by nothing.
    *
-   * It is not an access filter either: anyone may write to the report inbox
-   * and the content analysis decides whether the mail is filed. The alias only
-   * decides who is entitled to an answer.
+   * Held the secondary addresses a member forwarded reports from. Retired in
+   * 09/2026: every address anyone forwards from is a member account of theirs,
+   * so `resolveMemberByEmail` finds them on `users.email` alone, and
+   * `addMemberAlias` refused an address that was already an account anyway —
+   * the table could not hold the very addresses it was built for.
+   *
+   * Kept declared rather than dropped, same stance as the legacy `forecasts`
+   * and the inert Gmail tables: removing it means purging prod first, then
+   * narrowing. Cf. `KNOWN_ISSUES.md` § « Adresses d'envoi des reports ».
    */
   userEmailAliases: defineTable({
     userId: v.id('users'),
