@@ -77,6 +77,92 @@ async function requireAnyMember(ctx: QueryCtx) {
   return user
 }
 
+/** The orgs a user belongs to, as a set of id strings. */
+async function orgIdsOf(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+): Promise<Set<string>> {
+  const memberships = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect()
+  return new Set(memberships.map((m) => m.orgId as string))
+}
+
+/**
+ * Who the caller is, for the row-level test below. Built once per request:
+ * `senders` memoizes the "does this sender share an org with me?" answer,
+ * because a page of 100 rows carries a handful of distinct senders.
+ */
+type Perimeter = {
+  orgIds: Set<string>
+  superAdmin: boolean
+  senders: Map<string, boolean>
+}
+
+async function perimeterOf(
+  ctx: QueryCtx,
+  user: Doc<'users'>,
+): Promise<Perimeter> {
+  return {
+    orgIds: await orgIdsOf(ctx, user._id),
+    superAdmin: user.superAdmin === true,
+    senders: new Map(),
+  }
+}
+
+/**
+ * Whether a queue row concerns the caller.
+ *
+ * `inboundEmails` carries no `orgId` — a mail belongs to nobody until
+ * identification matches a participation — so the tenant is read off the two
+ * things the row does carry:
+ * - its MATCHED entities, once there are any;
+ * - its SENDER, which is what makes my own forward visible while it is still
+ *   unmatched, and in quarantine when it never matches.
+ *
+ * A row with neither is attributable to no tenant (spam, a stranger writing
+ * to the open address). Somebody still has to triage it, so it goes to the
+ * super-admins rather than to everyone.
+ */
+async function inPerimeter(
+  ctx: QueryCtx,
+  p: Perimeter,
+  row: Doc<'inboundEmails'>,
+): Promise<boolean> {
+  const matched = row.matchedCompanies ?? []
+  for (const m of matched) {
+    if (p.orgIds.has(m.orgId)) return true
+  }
+  if (row.senderUserId) {
+    const key = row.senderUserId
+    let shares = p.senders.get(key)
+    if (shares === undefined) {
+      const senderOrgs = await orgIdsOf(ctx, row.senderUserId)
+      shares = [...senderOrgs].some((orgId) => p.orgIds.has(orgId))
+      p.senders.set(key, shares)
+    }
+    return shares
+  }
+  return matched.length === 0 ? p.superAdmin : false
+}
+
+/** The row, or `forbidden` when it is outside the caller's perimeter. */
+async function requireRowInPerimeter(
+  ctx: MutationCtx,
+  user: Doc<'users'>,
+  inboundEmailId: Id<'inboundEmails'>,
+): Promise<Doc<'inboundEmails'>> {
+  const row = await ctx.db.get('inboundEmails', inboundEmailId)
+  if (!row) throw new ConvexError('not_found')
+  // Checked BEFORE the state guards of each action, so a refusal never
+  // reveals what a row outside the perimeter holds.
+  if (!(await inPerimeter(ctx, await perimeterOf(ctx, user), row))) {
+    throw new ConvexError('forbidden')
+  }
+  return row
+}
+
 // ─── Ingest (called by the webhook) ──────────────────────────────────────────
 
 /**
@@ -297,7 +383,17 @@ export const list = query({
   handler: async (ctx) => {
     const user = await requireAnyMember(ctx)
 
-    const rows = await ctx.db.query('inboundEmails').order('desc').take(100)
+    // The last 100 rows, then the caller's own among them (`inPerimeter`).
+    // Filtering AFTER the take is deliberate: the rows carry the body
+    // snapshot and the extracted text, so widening the scan to refill the
+    // page would multiply the bytes read on every visit — cf. CLAUDE.md
+    // « un gros champ texte sur une ligne lue en liste ».
+    const recent = await ctx.db.query('inboundEmails').order('desc').take(100)
+    const perimeter = await perimeterOf(ctx, user)
+    const rows: Array<Doc<'inboundEmails'>> = []
+    for (const row of recent) {
+      if (await inPerimeter(ctx, perimeter, row)) rows.push(row)
+    }
     // Portfolio of the caller's orgs, read once: used to spot an org left
     // out of a report it may concern (see `relatedOrgNames` below).
     const visible = await visiblePortfolio(ctx, user._id)
@@ -445,15 +541,22 @@ export const listAssignTargets = query({
 })
 
 /**
- * Every entity representing the same participation as `company`, across all
- * orgs — same identity key as automatic identification
+ * Every entity representing the same participation as `company`, across the
+ * orgs the caller belongs to — same identity key as automatic identification
  * (convex/lib/emailIdentify.ts): the domain when it carries a single
  * participation, else the name. A sponsor domain shared by several vehicles
  * (Sezame Immo 2 / 6) therefore fans out to the chosen vehicle only.
+ *
+ * Bounded to the caller's orgs and not to every org: the fan-out is what
+ * serves one company held under two names (Oprtrs & Co / OPRTRS CLUB), and
+ * that case only ever spans orgs the same person holds. Left unbounded, a
+ * domain shared with a third party's participation would attach their report
+ * to ours — silently, since nothing in the queue shows the other tenant.
  */
 async function sameParticipation(
   ctx: MutationCtx,
   company: Doc<'companies'>,
+  orgIds: Set<string>,
 ): Promise<Array<{ companyId: Id<'companies'>; orgId: Id<'organizations'> }>> {
   const all: Array<{
     companyId: Id<'companies'>
@@ -461,11 +564,12 @@ async function sameParticipation(
     name: string
     domain: string | null
   }> = []
-  const orgs = await ctx.db.query('organizations').collect()
-  for (const org of orgs) {
+  for (const orgId of orgIds) {
     const companies = await ctx.db
       .query('companies')
-      .withIndex('by_org_kind', (q) => q.eq('orgId', org._id).eq('kind', 'portfolio'))
+      .withIndex('by_org_kind', (q) =>
+        q.eq('orgId', orgId as Id<'organizations'>).eq('kind', 'portfolio'),
+      )
       .collect()
     for (const c of companies) {
       // The chosen company is kept even when archived — it is an explicit pick.
@@ -511,6 +615,19 @@ export const assignCompany = mutation({
     if (companyIds.length === 0) throw new ConvexError('invalid_args')
     const row = await ctx.db.get('inboundEmails', inboundEmailId)
     if (!row) throw new ConvexError('not_found')
+    // A row already attributed to another tenant is not up for grabs: filing
+    // it would copy its content into an org it never concerned. An
+    // UNATTRIBUTED row (no sender, no match — a founder writing to the open
+    // address) stays claimable by whoever handles the queue, which is the
+    // only way those mails ever get filed.
+    const unattributed =
+      !row.senderUserId && (row.matchedCompanies ?? []).length === 0
+    if (
+      !unattributed &&
+      !(await inPerimeter(ctx, await perimeterOf(ctx, user), row))
+    ) {
+      throw new ConvexError('forbidden')
+    }
     const additive = row.status === 'processed'
     if (!additive && row.status !== 'needs_review' && row.status !== 'rejected') {
       throw new ConvexError('invalid_status')
@@ -520,11 +637,14 @@ export const assignCompany = mutation({
     if (additive) {
       for (const m of row.matchedCompanies ?? []) matched.set(m.companyId, m)
     }
+    const callerOrgIds = await orgIdsOf(ctx, user._id)
     for (const companyId of companyIds) {
       const company = await ctx.db.get('companies', companyId)
       if (!company || company.kind !== 'portfolio') throw new ConvexError('not_found')
       await requireOrgMember(ctx, company.orgId)
-      for (const m of await sameParticipation(ctx, company)) matched.set(m.companyId, m)
+      for (const m of await sameParticipation(ctx, company, callerOrgIds)) {
+        matched.set(m.companyId, m)
+      }
     }
 
     await ctx.db.patch('inboundEmails', inboundEmailId, {
@@ -721,8 +841,7 @@ export const reprocess = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }) => {
     const user = await requireAnyMember(ctx)
-    const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row) throw new ConvexError('not_found')
+    const row = await requireRowInPerimeter(ctx, user, inboundEmailId)
     if (row.status === 'processing') throw new ConvexError('invalid_status')
     // The replay is a gesture on every sheet the mail was filed under —
     // logged before the match is cleared, so the entities are still known.
@@ -774,8 +893,7 @@ export const storeAnyway = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }) => {
     const user = await requireAnyMember(ctx)
-    const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row) throw new ConvexError('not_found')
+    const row = await requireRowInPerimeter(ctx, user, inboundEmailId)
     if (row.status !== 'needs_review' || row.statusReason !== 'possible_duplicate') {
       throw new ConvexError('invalid_status')
     }
@@ -803,9 +921,8 @@ export const storeAnyway = mutation({
 export const reject = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }) => {
-    await requireAnyMember(ctx)
-    const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row) throw new ConvexError('not_found')
+    const user = await requireAnyMember(ctx)
+    const row = await requireRowInPerimeter(ctx, user, inboundEmailId)
     if (row.status !== 'needs_review' && row.status !== 'received') {
       throw new ConvexError('invalid_status')
     }
@@ -873,9 +990,8 @@ async function reportsOfInbound(
 export const deleteEmail = mutation({
   args: { inboundEmailId: v.id('inboundEmails') },
   handler: async (ctx, { inboundEmailId }) => {
-    await requireAnyMember(ctx)
-    const row = await ctx.db.get('inboundEmails', inboundEmailId)
-    if (!row) throw new ConvexError('not_found')
+    const user = await requireAnyMember(ctx)
+    const row = await requireRowInPerimeter(ctx, user, inboundEmailId)
     if (row.status === 'processing') throw new ConvexError('invalid_status')
 
     const reports = await reportsOfInbound(ctx, row)
@@ -948,7 +1064,11 @@ export const createFromUpload = mutation({
       })
     }
 
-    const matched = await sameParticipation(ctx, company)
+    const matched = await sameParticipation(
+      ctx,
+      company,
+      await orgIdsOf(ctx, user._id),
+    )
     const trimmedNote = note?.trim()
 
     const id = await ctx.db.insert('inboundEmails', {

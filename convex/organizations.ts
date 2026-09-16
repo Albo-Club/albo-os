@@ -7,6 +7,7 @@ import {
   requireOrgRole,
   safeAppUser,
 } from './lib/auth'
+import { logCompanyEvent, userActor } from './lib/companyEvents'
 import {
   notificationKindValidator,
   readAlertPrefs,
@@ -213,6 +214,23 @@ export const create = mutation({
       role: 'owner',
       joinedAt: Date.now(),
     })
+    // The org's own company, as `migrations/createSubsidiaryOrgs` poses it.
+    // Without it the org is unusable rather than empty: a deal's investor and
+    // a bank account's owner must be a `group_*` entity
+    // (`assertInvestorIsGroupEntity`, `cash.ts`), and no front surface can
+    // create one — they all write `portfolio`. The rest of the identity
+    // (SIREN, legal form…) is filled in afterwards on the company sheet.
+    const rootCompanyId = await ctx.db.insert('companies', {
+      orgId,
+      name: trimmedName,
+      kind: 'group_root',
+    })
+    await logCompanyEvent(
+      ctx,
+      { orgId, companyId: rootCompanyId },
+      userActor(user._id),
+      { kind: 'company_created' },
+    )
     await setLastOrgSlug(ctx, user, normalizedSlug)
     return { orgId, slug: normalizedSlug }
   },

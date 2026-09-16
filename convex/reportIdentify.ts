@@ -39,7 +39,8 @@ import {
 } from './lib/emailIdentify'
 import { ModelOutputError, isTransientModelError } from './lib/modelRetry'
 import type { Identification } from './lib/emailIdentify'
-import type { Id } from './_generated/dataModel'
+import type { QueryCtx } from './_generated/server'
+import type { Doc, Id } from './_generated/dataModel'
 
 const MAX_BODY = 15_000
 
@@ -121,11 +122,43 @@ export const getCompany = internalQuery({
   },
 })
 
-/** All active portfolio companies across ALL orgs (the LLM's candidate list). */
+/** The orgs a member belongs to, as full rows (the candidate list needs the name). */
+async function orgsOfMember(
+  ctx: QueryCtx,
+  userId: Id<'users'>,
+): Promise<Array<Doc<'organizations'>>> {
+  const memberships = await ctx.db
+    .query('organizationMembers')
+    .withIndex('by_user', (q) => q.eq('userId', userId))
+    .collect()
+  const out: Array<Doc<'organizations'>> = []
+  for (const m of memberships) {
+    const org = await ctx.db.get('organizations', m.orgId)
+    if (org) out.push(org)
+  }
+  return out
+}
+
+/**
+ * The model's candidate list: active portfolio companies.
+ *
+ * Scoped to the FORWARDER's orgs when the mail is attributed to one of our
+ * members — what someone transfers concerns the vehicles they hold, and
+ * nothing stops two tenants from holding companies with the same name or
+ * domain, which would file one's report under the other's participation.
+ *
+ * With nobody to attribute the mail to (`senderUserId` absent: a founder
+ * writing to the open address directly), the whole portfolio stays on the
+ * table. Narrowing it to nothing would stop filing those mails altogether,
+ * and the content is what earns a mail its analysis, never who sent it (cf.
+ * `markProcessing` below).
+ */
 export const listCandidates = internalQuery({
-  args: {},
-  handler: async (ctx): Promise<Array<Candidate>> => {
-    const orgs = await ctx.db.query('organizations').collect()
+  args: { senderUserId: v.optional(v.id('users')) },
+  handler: async (ctx, { senderUserId }): Promise<Array<Candidate>> => {
+    const orgs = senderUserId
+      ? await orgsOfMember(ctx, senderUserId)
+      : await ctx.db.query('organizations').collect()
     const out: Array<Candidate> = []
     for (const org of orgs) {
       const companies = await ctx.db
@@ -278,7 +311,7 @@ export const run = internalAction({
 
     const candidates: Array<Candidate> = await ctx.runQuery(
       internal.reportIdentify.listCandidates,
-      {},
+      { senderUserId: row.senderUserId },
     )
     const body = row.bodyText || row.bodyHtml || ''
 

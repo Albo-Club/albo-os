@@ -29,7 +29,8 @@
   },
   "orgSwitcher": {
     "label": "Organizations",
-    "allOrganizations": "All organizations"
+    "allOrganizations": "All organizations",
+    "create": "Create an organization"
   },
   "theme": {
     "label": "Theme",
@@ -44,7 +45,7 @@
   "redirecting": "Redirecting…",
   "onboarding": {
     "metaTitle": "Create your organization — albo",
-    "title": "Create your first organization",
+    "title": "Create an organization",
     "description": "Your workspace is scoped to an organization. You can create more later.",
     "name": "Name",
     "namePlaceholder": "Acme Inc.",

@@ -29,7 +29,8 @@
   },
   "orgSwitcher": {
     "label": "Organisations",
-    "allOrganizations": "Toutes les organisations"
+    "allOrganizations": "Toutes les organisations",
+    "create": "Créer une organisation"
   },
   "theme": {
     "label": "Thème",
@@ -44,7 +45,7 @@
   "redirecting": "Redirection…",
   "onboarding": {
     "metaTitle": "Créez votre organisation — albo",
-    "title": "Créez votre première organisation",
+    "title": "Créer une organisation",
     "description": "Votre espace de travail est rattaché à une organisation. Vous pourrez en créer d'autres plus tard.",
     "name": "Nom",
     "namePlaceholder": "Acme Inc.",

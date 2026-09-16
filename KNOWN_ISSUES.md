@@ -2182,6 +2182,65 @@ est **publiée**. Le report qui en est digéré porte donc « Publié le », com
 l'entrée portail qu'affiche la frise quand la publication n'a pas été digérée
 — d'où `source` dans le retour de `companyReports.listByCompany`.
 
+## « Membre d'au moins une org » n'est pas une frontière de tenancy
+
+`inboundEmails` ne porte **pas** d'`orgId`, et ne peut pas en porter : un mail
+n'appartient à personne tant que l'identification ne l'a pas rattaché à une
+participation. La file de tri a donc longtemps eu pour frontière
+« membre de ≥ 1 org » (`reportInbox.requireAnyMember`), présentée comme « la
+même que la vue agrégée ». Ça n'en était pas une : `aggregate.ts` lit les
+**memberships de l'appelant**, alors que `requireAnyMember` ne vérifie que
+l'existence d'une membership, n'importe laquelle. L'équivalence ne tenait que
+par une coïncidence de peuplement — deux utilisateurs, membres de toutes les
+orgs. Le jour où une org tierce existe, la même fonction livre à son membre
+les 100 derniers mails du déploiement, avec le droit de les rejeter et de les
+supprimer.
+
+Le tenant se lit donc sur les deux seules choses que la ligne porte
+(`reportInbox.inPerimeter`) : ses entités **rattachées**, et son
+**expéditeur**. La jambe expéditeur n'est pas du luxe — sans elle, on ne voit
+pas son propre transfert avant le rattachement, donc jamais quand il finit en
+quarantaine. Trois conséquences qui ne se devinent pas :
+
+1. **Une ligne sans rattachement ni expéditeur reconnu n'appartient à
+   personne** (indésirable, inconnu écrivant à l'adresse ouverte). Elle est
+   réservée aux `users.superAdmin` : il faut bien que quelqu'un la trie, mais
+   pas tout le monde. Corollaire à connaître : un membre **non** super-admin
+   ne voit plus les mails d'un fondateur qui écrit directement — c'est un
+   `superAdmin` à cocher, pas un bug à contourner.
+2. **`listCandidates` suit l'expéditeur, sauf quand il n'y en a pas.** Borner
+   les candidats du modèle au portefeuille des orgs du transféreur ferme la
+   fuite principale. Mais un fondateur qui écrit directement n'a pas de
+   compte : borner à rien aurait supprimé le classement automatique de ces
+   mails, qui est une fonctionnalité voulue et testée
+   (`regression.reportSenders.test.ts`). Sans expéditeur attribué, tout le
+   portefeuille reste donc sur la table. Résidu assumé : un mail non
+   attribuable peut encore tomber dans n'importe quelle org, si un nom ou un
+   domaine collisionne entre deux tenants.
+3. **Les fixtures de test doivent porter `senderUserId`.** Les tests qui
+   insèrent une ligne en base sautent `ingest`, donc n'avaient aucune raison
+   de renseigner l'attribution — et devenaient des lignes orphelines dès que
+   `detachCompany` vidait leurs rattachements. Deux fichiers de régression ont
+   dû être rendus fidèles à ce que `ingest` écrit vraiment pour l'adresse d'un
+   membre. Une fixture infidèle donne ici un échec qui ressemble à une
+   régression du code.
+
+**Le filtrage se fait après le `take(100)`, pas avant.** Les lignes portent
+l'instantané du corps et le texte extrait : élargir le scan pour re-remplir la
+page multiplierait les octets lus à chaque visite (cf. CLAUDE.md « un gros
+champ texte sur une ligne lue en liste »). Un membre ne voit donc que ses
+lignes **parmi les 100 dernières** du déploiement. Tenable au volume actuel
+(quelques reports par semaine) ; à revoir en pagination indexée le jour où un
+tenant bavard pousserait les lignes d'un autre hors de la fenêtre.
+
+**Le même trou par une autre porte : `sameParticipation`.** Le rattachement
+manuel étend la pose aux entités de même clé d'identité, et le faisait sur
+**toutes** les orgs. La destination était bien contrôlée (`requireOrgMember`
+sur chaque société choisie), mais l'extension, elle, ne l'était pas : un
+domaine partagé avec la participation d'un tiers y rangeait son rapport chez
+nous, sans erreur et sans trace. La leçon se généralise : contrôler la cible
+d'un geste ne contrôle pas son **essaimage**.
+
 ## Retirer un report — l'empreinte à défaire, et le blob qui se compte
 
 Ranger un report écrit **cinq** choses par entité rattachée

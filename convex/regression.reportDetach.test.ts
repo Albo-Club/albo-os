@@ -38,12 +38,16 @@ const PERIOD_END = 1_702_000_000_000
 async function createInboundEmail(
   t: Harness,
   storageId: Id<'_storage'>,
+  // Attribution, as `ingest` sets it for a member's address: it is what the
+  // queue reads to decide whose row this is, once nothing is matched any more.
+  senderUserId: Id<'users'>,
 ): Promise<Id<'inboundEmails'>> {
   return await t.run(async (ctx) => {
     return await ctx.db.insert('inboundEmails', {
       agentmailInboxId: 'inbox-test',
       agentmailMessageId: 'msg-avril',
       fromEmail: 'benjamin@test.dev',
+      senderUserId,
       toEmails: ['reports@test.dev'],
       ccEmails: [],
       subject: 'Update avril',
@@ -102,7 +106,7 @@ async function setupFanOut(t: Harness, user: TestUser) {
   const storageId = await t.run(async (ctx) =>
     ctx.storage.store(new Blob(['pdf'], { type: 'application/pdf' })),
   )
-  const emailId = await createInboundEmail(t, storageId)
+  const emailId = await createInboundEmail(t, storageId, user.userId)
   await t.run(async (ctx) => {
     await ctx.db.patch('inboundEmails', emailId, {
       matchedCompanies: [
@@ -188,7 +192,7 @@ describe('detachCompany', () => {
     const t = setupHarness()
     const user = await createUser(t, 'benjamin@test.dev')
     const s = await setupFanOut(t, user)
-    const older = await createInboundEmail(t, s.storageId)
+    const older = await createInboundEmail(t, s.storageId, user.userId)
     const olderReport = await store(t, s.wrong, s.calte.orgId, older, 'March 2026')
 
     await user.as.mutation(api.reportInbox.detachCompany, { reportId: s.wrongReport })
@@ -388,7 +392,7 @@ describe('deleteEmail', () => {
         truncated: false,
       })
     })
-    const emailId = await createInboundEmail(t, storageId)
+    const emailId = await createInboundEmail(t, storageId, user.userId)
 
     await user.as.mutation(api.reportInbox.deleteEmail, { inboundEmailId: emailId })
 

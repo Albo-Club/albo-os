@@ -1499,11 +1499,23 @@ export const sendWeeklyDigest = internalMutation({
       if (!user?.email) continue
       for (const digest of digests) {
         // The mail is titled with the family's head org, read from the org
-        // rows so a rename follows on its own. A family whose head is missing
-        // falls back to its first section — it still has a name to show.
+        // rows so a rename follows on its own — but only when the recipient
+        // belongs to it. `familyOf` files everything that is not Albo under
+        // CALTE, so an org outside the group would otherwise send its holder
+        // a mail titled with OUR head company. A head the recipient does not
+        // belong to falls back to their first section — it still has a name
+        // to show.
+        const head = orgs.find((o) => o.slug === FAMILY_HEAD_SLUG[digest.family])
+        const headIsTheirs = head
+          ? (await ctx.db
+              .query('organizationMembers')
+              .withIndex('by_org_and_user', (q) =>
+                q.eq('orgId', head._id).eq('userId', userId),
+              )
+              .unique()) !== null
+          : false
         const familyName =
-          orgs.find((o) => o.slug === FAMILY_HEAD_SLUG[digest.family])?.name ??
-          digest.sections[0].orgName
+          (headIsTheirs ? head?.name : undefined) ?? digest.sections[0].orgName
         const { subject, html, text } = weeklyDigestEmail({
           locale: user.preferredLanguage === 'fr' ? 'fr' : 'en',
           familyName,
