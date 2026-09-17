@@ -210,17 +210,23 @@ le chemin du provider est inerte sans le lien de confiance vers ce dépôt, et
 le dossier Drive est protégé par l'appartenance, pas par l'obscurité.
 
 ⚠️ **Permissions de la clé Convex.** L'archive se construit avec
-`convex run` sur des `internalQuery` : la clé doit pouvoir **exécuter des
-fonctions** sur la prod. Les permissions Backups de l'ancien `convex export`
-(`backups:view` / `create` / `download`) ne servent plus à rien — et la clé
-créée le 09/09/2026 avec elles seules **ne suffit pas** : en recréer une
-(les permissions d'une clé ne se modifient pas). La documentation Convex ne
-dit pas quelle permission granulaire couvre `convex run` ; à défaut, une clé
-de déploiement prod standard fait l'affaire. Ne cocher **ni** `backups:delete`
-**ni** `backups:import`, destructives et sans usage ici. Le premier run après
-changement de clé se lance à la main (Actions → Run workflow, **à blanc**
-d'abord : `node scripts/convex-backup.mjs --dry` en local dit tout de suite si
-la clé passe).
+`convex run` sur des `internalQuery`. Cocher exactement deux cases, vérifiées
+par le run n° 13 du 17/09/2026 (clé `github-backup`) :
+
+- `deployment:functions:runInternalQueries` — la seule qui travaille : les
+  trois requêtes de `migrations/backupExport`.
+- `deployment:data:view` — lecture seule, pour ne pas devoir recréer la clé si
+  le CLI la réclame un jour.
+
+Et **rien d'autre** : ni `runInternalMutations` / `runInternalActions` (un
+backup n'écrit rien — la purge RAG se lance depuis un poste avec son propre
+login, pas avec cette clé), ni `deploy`, ni `data:write`, ni aucun
+`backups:*`. Les permissions Backups de l'ancien `convex export` ne servent
+plus, et la clé du 09/09/2026 qui ne portait qu'elles a été supprimée : les
+permissions d'une clé ne se modifient pas, on en recrée une. Le premier run
+après changement de clé se lance à la main (Actions → Run workflow ; en
+local, `node scripts/convex-backup.mjs --dry` dit tout de suite si la clé
+passe).
 
 ⚠️ **`GDRIVE_BACKUP_FOLDER_ID` est l'identifiant, pas l'URL.** Coller l'URL
 entière est le réflexe naturel ; le script sait désormais en extraire l'id,

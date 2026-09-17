@@ -40,10 +40,12 @@
  * Environment:
  *   - CONVEX_DEPLOY_KEY        prod deploy key, read by the Convex CLI (secret).
  *                              The archive is built with `convex run` on
- *                              internal queries, so the key must be allowed
- *                              to run functions; the Backups permissions of
- *                              the former `convex export` are no longer
- *                              needed (cf. MIGRATIONS.md for the list).
+ *                              internal queries, so the key carries
+ *                              `deployment:functions:runInternalQueries` +
+ *                              `deployment:data:view` and nothing else — no
+ *                              write, no deploy, none of the Backups
+ *                              permissions the former `convex export` needed
+ *                              (cf. MIGRATIONS.md).
  *   - GDRIVE_ACCESS_TOKEN      a short-lived Google OAuth access token
  *   - GDRIVE_BACKUP_FOLDER_ID  the target folder on the shared drive
  *

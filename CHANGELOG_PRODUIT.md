@@ -23,6 +23,24 @@ bas de page.
 
 ---
 
+## v1.236.2 — 17/09/2026 à 15:10 — Runbook du backup : les deux permissions exactes de la clé
+
+Mise à jour de documentation seule, sans changement dans l'app : le runbook
+de la sauvegarde nomme désormais les deux permissions exactes que la clé
+Convex doit porter, vérifiées sur le premier run réel du nouveau backup.
+
+> **🔧 Notes techniques**
+>
+> - `MIGRATIONS.md` § « Backup automatique Convex → Drive » : la clé
+>   `CONVEX_DEPLOY_KEY` porte `deployment:functions:runInternalQueries` +
+>   `deployment:data:view`, rien d'autre (vérifié par le run n° 13 du
+>   17/09/2026, clé `github-backup`, 52 tables / 9 745 lignes / 15,6 Mo).
+>   Retrait de la phrase « la doc ne dit pas quelle permission couvre
+>   `convex run` » devenue fausse.
+> - Même liste reportée dans `TESTING.md` B12, l'en-tête de
+>   `.github/workflows/convex-backup.yml` et celui de
+>   `scripts/convex-backup.mjs`.
+
 ## v1.236.1 — 17/09/2026 à 13:10 — La sauvegarde nocturne ne lit plus toute la base
 
 Le compteur de lectures Convex a explosé depuis le 9 septembre (51 Go en
