@@ -21,6 +21,7 @@ import { internalAction, internalMutation } from './_generated/server'
 import { downloadAttachment } from './agentmail'
 import { csvToText, excelToText } from './lib/excel'
 import { downloadDocSend } from './lib/docsend'
+import { downloadGDrive } from './lib/gdrive'
 import { EXCEL_EXTS, MIN_OCR_IMAGE_BYTES, boundText, ext, isImage } from './lib/fileText'
 import { fetchNotionText } from './lib/notion'
 import { ocrImage, ocrPdf } from './lib/ocr'
@@ -113,44 +114,6 @@ export const setExtraction = internalMutation({
     return null
   },
 })
-
-// ─── Link downloads ──────────────────────────────────────────────────────────
-
-async function downloadGDrive(
-  url: string,
-  fileId: string,
-): Promise<{ buf: ArrayBuffer; kind: 'pdf' | 'excel' | 'other'; contentType: string } | null> {
-  let target: string
-  let kind: 'pdf' | 'excel' | 'other' = 'other'
-  if (url.includes('/spreadsheets/')) {
-    target = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`
-    kind = 'excel'
-  } else if (url.includes('/document/')) {
-    target = `https://docs.google.com/document/d/${fileId}/export?format=pdf`
-    kind = 'pdf'
-  } else if (url.includes('/presentation/')) {
-    target = `https://docs.google.com/presentation/d/${fileId}/export?format=pdf`
-    kind = 'pdf'
-  } else {
-    target = `https://drive.google.com/uc?export=download&id=${fileId}`
-  }
-  try {
-    const res = await fetch(target, { redirect: 'follow' })
-    if (!res.ok) return null
-    const contentType = res.headers.get('content-type') ?? 'application/octet-stream'
-    // A private file redirects to an HTML sign-in page — not a download.
-    if (contentType.includes('text/html')) return null
-    const buf = await res.arrayBuffer()
-    if (kind === 'other') {
-      if (contentType.includes('pdf')) kind = 'pdf'
-      else if (contentType.includes('spreadsheet') || contentType.includes('ms-excel'))
-        kind = 'excel'
-    }
-    return { buf, kind, contentType }
-  } catch {
-    return null
-  }
-}
 
 // ─── The run ─────────────────────────────────────────────────────────────────
 
@@ -296,13 +259,9 @@ export const run = internalAction({
     }
 
     for (const { url, fileId } of links.googleDrive.slice(0, MAX_LINKS_PER_KIND)) {
-      const dl = await downloadGDrive(url, fileId)
-      if (!dl) {
-        outcomes.push({ kind: 'gdrive', label: url, state: 'failed', detail: 'gdrive_unreachable' })
-        continue
-      }
-      if (dl.buf.byteLength > MAX_FILE_BYTES) {
-        outcomes.push({ kind: 'gdrive', label: url, state: 'failed', detail: 'file_too_large' })
+      const dl = await downloadGDrive(url, fileId, MAX_FILE_BYTES)
+      if (dl.kind === 'failed') {
+        outcomes.push({ kind: 'gdrive', label: url, state: 'failed', detail: dl.detail })
         continue
       }
       if (dl.kind === 'pdf') {
