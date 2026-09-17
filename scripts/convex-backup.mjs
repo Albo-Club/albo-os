@@ -3,9 +3,18 @@
  * Automated Convex backup to a Google Drive shared drive (ALB-234).
  *
  * Convex has no scheduled export to a destination we choose (the built-in
- * daily backup is Pro-only and caps at 7 days), so an outside scheduler runs
- * the CLI. Here that scheduler is GitHub Actions
+ * daily backup is Pro-only and caps at 7 days), so an outside scheduler
+ * builds the archive. Here that scheduler is GitHub Actions
  * (`.github/workflows/convex-backup.yml`).
+ *
+ * The archive is NOT a `convex export`. A snapshot export reads the whole
+ * deployment, components included, and Convex bills every byte read: the RAG
+ * component's embeddings (~5 GB, rebuildable from the documents) made each
+ * nightly export read 25× the data it saved — 42 GB in eight nights, 83 % of
+ * a month's Database I/O. The archive is built instead from the APPLICATION
+ * tables, paged through `migrations/backupExport` (`lib/backup-export.mjs`),
+ * in the same layout as a dashboard export so `convex import` still reads it.
+ * cf. KNOWN_ISSUES.md « `convex export` lit chaque composant ».
  *
  * ONE export per day, and its kind depends on the date:
  *   - every day        → data only
@@ -30,13 +39,11 @@
  *
  * Environment:
  *   - CONVEX_DEPLOY_KEY        prod deploy key, read by the Convex CLI (secret).
- *                              Needs `deployment:backups:view`,
- *                              `:create` AND `:download`: `convex export`
- *                              goes through the Backups API, not plain data
- *                              reads. Convex reveals the missing permission
- *                              one error at a time, so grant the three at
- *                              once — `data:view` alone fails, and so does
- *                              create+download without view.
+ *                              The archive is built with `convex run` on
+ *                              internal queries, so the key must be allowed
+ *                              to run functions; the Backups permissions of
+ *                              the former `convex export` are no longer
+ *                              needed (cf. MIGRATIONS.md for the list).
  *   - GDRIVE_ACCESS_TOKEN      a short-lived Google OAuth access token
  *   - GDRIVE_BACKUP_FOLDER_ID  the target folder on the shared drive
  *
@@ -66,11 +73,12 @@
  */
 import { execFile } from 'node:child_process'
 import { createReadStream } from 'node:fs'
-import { mkdtemp, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { promisify } from 'node:util'
+import { exportDeployment } from './lib/backup-export.mjs'
 import { planRetention } from './lib/backup-retention.mjs'
 
 const run = promisify(execFile)
@@ -92,7 +100,9 @@ const UPLOAD_URL = 'https://www.googleapis.com/upload/drive/v3/files'
 const FILES_URL = 'https://www.googleapis.com/drive/v3/files'
 
 const human = (b) =>
-  b >= 1024 ** 3 ? `${(b / 1024 ** 3).toFixed(2)} Go` : `${(b / 1024 ** 2).toFixed(1)} Mo`
+  b >= 1024 ** 3
+    ? `${(b / 1024 ** 3).toFixed(2)} Go`
+    : `${(b / 1024 ** 2).toFixed(1)} Mo`
 
 /**
  * The folder id, from either the raw id or the Drive URL it sits in. Pasting
@@ -107,7 +117,9 @@ function folderIdFrom(value) {
 function requireEnv(name) {
   const value = process.env[name]
   if (!value) {
-    console.error(`${name} manquant. Voir MIGRATIONS.md § « Backup automatique Convex → Drive ».`)
+    console.error(
+      `${name} manquant. Voir MIGRATIONS.md § « Backup automatique Convex → Drive ».`,
+    )
     process.exit(1)
   }
   return value
@@ -124,10 +136,65 @@ function decideKind(now) {
 }
 
 // ── Export + verification ─────────────────────────────────────────────────
-async function exportSnapshot(path, includeFiles) {
-  const flags = ['exec', 'convex', 'export', '--prod', '--path', path]
-  if (includeFiles) flags.push('--include-file-storage')
-  await run('pnpm', flags, { maxBuffer: 32 * 1024 * 1024 })
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+
+/**
+ * `convex run --prod <fn> <json>` → parsed stdout, retried. Same shape as
+ * scripts/storage-audit.mjs: the CLI shells out and can die on a transient
+ * network fault, which without this would abort the whole archive.
+ */
+async function runQuery(fn, payload, attempt = 1) {
+  try {
+    const { stdout } = await run(
+      'pnpm',
+      ['exec', 'convex', 'run', '--prod', fn, JSON.stringify(payload)],
+      { maxBuffer: 64 * 1024 * 1024 },
+    )
+    // The CLI prints a banner before the JSON payload on some versions.
+    const candidates = [stdout.indexOf('['), stdout.indexOf('{')].filter(
+      (i) => i !== -1,
+    )
+    return JSON.parse(stdout.slice(Math.min(...candidates)))
+  } catch (err) {
+    if (attempt >= 3) throw err
+    const wait = attempt * 4000
+    console.log(
+      `    réseau instable (${fn}), nouvelle tentative dans ${wait / 1000}s…`,
+    )
+    await sleep(wait)
+    return runQuery(fn, payload, attempt + 1)
+  }
+}
+
+async function download(url) {
+  const res = await fetch(url)
+  if (!res.ok || !res.body)
+    throw new Error(`Téléchargement refusé (${res.status}) : ${url}`)
+  return res.body
+}
+
+/**
+ * Page the application tables (and the file storage when `includeFiles`)
+ * into `dir`, then zip the folder in place. `zip -X` leaves out the
+ * platform extra fields so the archive is the same bytes wherever it runs.
+ */
+async function exportSnapshot(path, dir, includeFiles) {
+  const stage = join(dir, 'export')
+  await mkdir(stage)
+  const { tables, files } = await exportDeployment({
+    dir: stage,
+    includeFiles,
+    runQuery,
+    download,
+  })
+  const rows = Object.values(tables).reduce((sum, n) => sum + n, 0)
+  console.log(
+    `  ${Object.keys(tables).length} tables, ${rows} lignes${includeFiles ? `, ${files} fichiers` : ''}`,
+  )
+  await run('zip', ['-r', '-q', '-X', path, '.'], {
+    cwd: stage,
+    maxBuffer: 32 * 1024 * 1024,
+  })
 }
 
 /**
@@ -138,7 +205,9 @@ async function exportSnapshot(path, includeFiles) {
 async function verifyArchive(path, includeFiles) {
   const { size } = await stat(path)
   if (size < MIN_PLAUSIBLE_BYTES) {
-    throw new Error(`Archive suspecte : ${human(size)}, sous le plancher de ${human(MIN_PLAUSIBLE_BYTES)}.`)
+    throw new Error(
+      `Archive suspecte : ${human(size)}, sous le plancher de ${human(MIN_PLAUSIBLE_BYTES)}.`,
+    )
   }
 
   try {
@@ -147,29 +216,48 @@ async function verifyArchive(path, includeFiles) {
     throw new Error(`Archive corrompue (unzip -t a échoué) : ${err.message}`)
   }
 
-  const { stdout } = await run('unzip', ['-Z1', path], { maxBuffer: 128 * 1024 * 1024 })
+  const { stdout } = await run('unzip', ['-Z1', path], {
+    maxBuffer: 128 * 1024 * 1024,
+  })
   const entries = stdout.split('\n')
   for (const table of EXPECTED_TABLES) {
     // `unzip -Z1` lists directory markers too ("deals/"), so require a real
     // entry underneath: an empty folder is not an exported table.
-    if (!entries.some((e) => e.startsWith(`${table}/`) && e.length > table.length + 1)) {
-      throw new Error(`Archive incomplète : la table « ${table} » est absente ou vide.`)
+    if (
+      !entries.some(
+        (e) => e.startsWith(`${table}/`) && e.length > table.length + 1,
+      )
+    ) {
+      throw new Error(
+        `Archive incomplète : la table « ${table} » est absente ou vide.`,
+      )
     }
   }
   if (includeFiles && !entries.some((e) => e.startsWith('_storage'))) {
-    throw new Error('Archive « full » sans dossier _storage : les fichiers manquent.')
+    throw new Error(
+      'Archive « full » sans dossier _storage : les fichiers manquent.',
+    )
   }
   return { size, entries: entries.length }
 }
 
 // ── Drive ─────────────────────────────────────────────────────────────────
 async function uploadArchive(token, folderId, path, name, size) {
-  const start = await fetch(`${UPLOAD_URL}?uploadType=resumable&supportsAllDrives=true`, {
-    method: 'POST',
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json; charset=UTF-8' },
-    body: JSON.stringify({ name, parents: [folderId] }),
-  })
-  if (!start.ok) throw new Error(`Ouverture de l'upload refusée (${start.status}) : ${await start.text()}`)
+  const start = await fetch(
+    `${UPLOAD_URL}?uploadType=resumable&supportsAllDrives=true`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify({ name, parents: [folderId] }),
+    },
+  )
+  if (!start.ok)
+    throw new Error(
+      `Ouverture de l'upload refusée (${start.status}) : ${await start.text()}`,
+    )
   const location = start.headers.get('location')
   if (!location) throw new Error("Drive n'a pas renvoyé d'URL d'upload.")
 
@@ -178,11 +266,15 @@ async function uploadArchive(token, folderId, path, name, size) {
   // for a backup and keeps this script small.
   const res = await fetch(location, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/zip', 'Content-Length': String(size) },
+    headers: {
+      'Content-Type': 'application/zip',
+      'Content-Length': String(size),
+    },
     body: Readable.toWeb(createReadStream(path)),
     duplex: 'half',
   })
-  if (!res.ok) throw new Error(`Upload refusé (${res.status}) : ${await res.text()}`)
+  if (!res.ok)
+    throw new Error(`Upload refusé (${res.status}) : ${await res.text()}`)
   return await res.json()
 }
 
@@ -201,7 +293,8 @@ async function listArchives(token, folderId) {
     const res = await fetch(`${FILES_URL}?${params}`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!res.ok) throw new Error(`Listing refusé (${res.status}) : ${await res.text()}`)
+    if (!res.ok)
+      throw new Error(`Listing refusé (${res.status}) : ${await res.text()}`)
     const body = await res.json()
     files.push(...(body.files ?? []))
     pageToken = body.nextPageToken
@@ -227,7 +320,9 @@ async function main() {
   const includeFiles = decideKind(now)
   const name = `albo-os-${date}${includeFiles ? '-full' : ''}.zip`
 
-  console.log(`Archive du jour : ${name} (${includeFiles ? 'données + fichiers' : 'données seules'})`)
+  console.log(
+    `Archive du jour : ${name} (${includeFiles ? 'données + fichiers' : 'données seules'})`,
+  )
 
   const folderId = folderIdFrom(requireEnv('GDRIVE_BACKUP_FOLDER_ID'))
   // Nothing to sign here: the token is handed in by the caller (Workload
@@ -238,18 +333,23 @@ async function main() {
   const path = join(dir, name)
   try {
     console.log('  export en cours…')
-    await exportSnapshot(path, includeFiles)
+    await exportSnapshot(path, dir, includeFiles)
 
     const { size, entries } = await verifyArchive(path, includeFiles)
     console.log(`  archive vérifiée : ${human(size)}, ${entries} entrées`)
 
     const existing = await listArchives(token, folderId)
-    const { keep, drop, unknown } = planRetention([...existing.map((f) => f.name), name])
+    const { keep, drop, unknown } = planRetention([
+      ...existing.map((f) => f.name),
+      name,
+    ])
 
     if (dry) {
       console.log(`\n[--dry] rien n'est envoyé ni supprimé.`)
       console.log(`  garderait  : ${keep.length} archives`)
-      console.log(`  supprimerait : ${drop.length ? drop.join(', ') : '(aucune)'}`)
+      console.log(
+        `  supprimerait : ${drop.length ? drop.join(', ') : '(aucune)'}`,
+      )
       if (unknown.length) console.log(`  ignorerait : ${unknown.join(', ')}`)
       return
     }
@@ -259,7 +359,9 @@ async function main() {
 
     // Only now, with today's archive safely stored.
     if (unknown.length) {
-      console.log(`  ${unknown.length} fichier(s) hors convention, laissés en place : ${unknown.join(', ')}`)
+      console.log(
+        `  ${unknown.length} fichier(s) hors convention, laissés en place : ${unknown.join(', ')}`,
+      )
     }
     if (keep.length === 0) {
       // Cannot happen (today's archive is always kept), so if it does the

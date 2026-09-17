@@ -70,6 +70,17 @@ crons.interval(
   {},
 )
 
+// Delete the RAG entries a re-index has replaced. The component keeps every
+// replaced version (chunks + embeddings) until the app deletes it, and a
+// snapshot export reads them all. cf. convex/vectorize.ts
+// `cleanupReplacedEntries`.
+crons.interval(
+  'cleanup replaced rag entries',
+  { hours: 1 },
+  internal.vectorize.cleanupReplacedEntries,
+  {},
+)
+
 // Keep the Vercel SSR function warm (internal tool → near-zero traffic →
 // cold start on most arrivals otherwise). cf. convex/warmup.ts.
 crons.interval('warm vercel ssr', { minutes: 5 }, internal.warmup.pingSite, {})
