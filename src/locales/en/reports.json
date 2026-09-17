@@ -30,7 +30,8 @@
     "no_content": "No usable content",
     "analyze_error": "Analysis error",
     "manual_reject": "Manually rejected",
-    "possible_duplicate": "Possible duplicate"
+    "possible_duplicate": "Possible duplicate",
+    "stuck_processing": "Processing interrupted"
   },
   "actions": {
     "assign": "Assign",

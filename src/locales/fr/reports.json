@@ -30,7 +30,8 @@
     "no_content": "Aucun contenu exploitable",
     "analyze_error": "Erreur d'analyse",
     "manual_reject": "Rejeté manuellement",
-    "possible_duplicate": "Doublon probable"
+    "possible_duplicate": "Doublon probable",
+    "stuck_processing": "Traitement interrompu"
   },
   "actions": {
     "assign": "Rattacher",

@@ -23,6 +23,37 @@ bas de page.
 
 ---
 
+## v1.236.4 — 17/09/2026 à 18:10 — Un lien vers une vidéo ne bloque plus l'analyse d'un report
+
+Correctif : deux mails « Updates Ouisub » restaient indéfiniment « En
+traitement », participation rattachée mais rien d'analysé. En cause, un lien
+Google Drive vers une vidéo de 79 Mo dans le message cité en bas du fil :
+l'analyse tentait de télécharger le fichier entier et s'arrêtait net, sans
+rien signaler. Désormais, un lien Drive est d'abord examiné (type, taille)
+avant tout téléchargement : une vidéo ou un fichier trop volumineux est
+noté comme tel et le report est analysé normalement.
+
+Les mails déjà coincés sont libérés par une opération one-shot après mise en
+ligne, puis se retraitent d'un clic depuis la file des reports. Un nouveau
+motif « Traitement interrompu » les signale dans la file.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/gdrive.ts` (nouveau) : `downloadGDrive` fait un `HEAD`
+>   avant le `GET` — `content-type` ni PDF ni tableur → `{ kind: 'other' }`
+>   sans téléchargement, `content-length` > plafond → `file_too_large` sans
+>   lire le corps, timeout 60 s. Le contrôle post-lecture reste pour les
+>   exports Docs/Sheets qui annoncent `content-length: 0`.
+> - `convex/reportExtract.ts` : appelle le helper (plafond passé en
+>   argument), la fonction locale est retirée.
+> - `convex/migrations/releaseStuckInboundEmails.ts` (nouveau) : one-shot
+>   qui passe les `inboundEmails` en `processing` depuis > 60 min en
+>   `needs_review` / `stuck_processing`. À lancer **après** le déploiement.
+> - i18n `reports.reasons.stuck_processing` (fr/en) ; test
+>   `tests/gdrive.test.ts` (fetch mocké, la séquence HEAD/GET est vérifiée) ;
+>   `KNOWN_ISSUES.md` § « Un lien Drive vers une vidéo tue l'extraction »,
+>   ligne `MIGRATIONS.md`.
+
 ## v1.236.3 — 17/09/2026 à 15:15 — La purge de l'index de recherche avance une entrée à la fois
 
 Correctif interne : le premier lancement de la purge des anciennes versions

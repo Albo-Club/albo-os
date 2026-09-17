@@ -2023,6 +2023,54 @@ Trois pièges, tous payés une fois :
 Couvert par `convex/regression.modelRetry.test.ts` et
 `convex/regression.reportRetry.test.ts`.
 
+## Un lien Drive vers une vidéo tue l'extraction — et la ligne reste « En traitement » à vie
+
+Deux mails « Updates Ouisub » (16 et 17/09/2026) sont restés en
+`processing`, participation rattachée, colonne Contenu vide. Rien dans le
+mail n'était exotique : un texte court, zéro pièce jointe. Mais le message
+cité en bas du fil portait un lien Google Drive vers **une vidéo de 79 Mo**
+(créa publicitaire « témoignage Emmaüs Connect »).
+
+La chaîne exacte :
+
+1. `reportExtract.run` claim la ligne (`status: 'processing'`), détecte le
+   lien, et `downloadGDrive` faisait `fetch` puis `res.arrayBuffer()`. Le
+   plafond de 20 Mo n'était testé **qu'après**, sur le buffer déjà en
+   mémoire.
+2. L'action tourne dans le runtime Convex par défaut (pas de `"use node"`),
+   plafonné à **64 Mio**. 79 Mo → le runtime **tue** l'action.
+3. Un kill n'est pas une exception : le `try/catch` de la fonction ne
+   s'exécute pas, `setExtraction` n'est jamais appelée, la ligne garde
+   `processing` sans `sources`.
+4. Rien ne repasse : `retryAfterTransient` ne couvre que les deux briques
+   modèle (identify / analyze), il n'existe **aucun balayeur** pour
+   `inboundEmails` (contrairement à `documentsExtract.sweepStalePending`),
+   et la file verrouille tout sur une ligne `processing` — « Retraiter »
+   lève `invalid_status`, le bouton Supprimer est masqué.
+
+La règle : **lire les en-têtes avant le corps.** `convex/lib/gdrive.ts`
+fait un `HEAD` d'abord : un `content-type` ni PDF ni tableur est enregistré
+sans téléchargement (une vidéo n'est lisible à aucune taille), un
+`content-length` au-dessus du plafond est refusé (`file_too_large`) sans
+lire un octet, et le `GET` n'a lieu que pour un fichier qui mérite une
+lecture. Le contrôle post-lecture reste en filet : un export Docs/Sheets
+(généré à la volée) annonce `content-length: 0`. Google honore `HEAD` sur
+`drive.google.com/uc` comme sur les exports `docs.google.com` (vérifié le
+17/09/2026). Timeout de 60 s sur chaque requête, comme les fetchs Notion.
+
+Le même réflexe vaut pour toute source distante lue en mémoire dans une
+action : `downloadAttachment` (AgentMail) et `downloadDocSend` lisent encore
+le corps entier avant toute vérification — la taille d'une pièce jointe
+mail est bornée par le fournisseur, celle d'un DocSend par la conversion,
+mais aucune des deux n'est garantie sous 64 Mio.
+
+Débloquer les lignes déjà coincées :
+`migrations/releaseStuckInboundEmails:run` (cf. `MIGRATIONS.md`) les passe
+en `needs_review` / `stuck_processing`, puis « Retraiter » depuis la file.
+À lancer seulement une fois le correctif déployé, sinon le rejeu meurt sur
+le même fichier. Un futur crash d'une **autre** nature laissera de nouveau
+une ligne sans issue : le balayeur horaire manque toujours.
+
 ## Prompt de notation : l'exemple JSON fixe la note, et la symétrie forcée l'écrase
 
 Le score de santé de la synthèse IA (`INTELLIGENCE_SYSTEM_PROMPT`,
