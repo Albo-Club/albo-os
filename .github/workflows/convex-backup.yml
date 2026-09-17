@@ -2,7 +2,12 @@ name: Convex backup
 
 # Daily backup of the production deployment to a Google Drive shared drive
 # (ALB-234). Convex has no scheduled export to a destination we choose, so
-# this workflow is the scheduler: it runs the CLI and pushes the archive.
+# this workflow is the scheduler: it builds the archive and pushes it.
+#
+# The archive is built from the application tables through `convex run`, NOT
+# with `convex export`: a snapshot export reads every component too, and the
+# RAG embeddings (~5 GB, rebuildable) made each night cost 25× the data saved.
+# cf. scripts/convex-backup.mjs and KNOWN_ISSUES.md.
 #
 # ONE export per day. Its kind depends on the date, decided by the script:
 #   - every day                        → data only
@@ -21,7 +26,8 @@ name: Convex backup
 # the wrong trade.
 #
 # One repository SECRET (Settings → Secrets and variables → Actions → Secrets):
-#   CONVEX_DEPLOY_KEY  prod deploy key (Convex dashboard → prod → Deploy key)
+#   CONVEX_DEPLOY_KEY  prod deploy key (Convex dashboard → prod → Deploy key),
+#                      allowed to run functions — see MIGRATIONS.md
 #
 # Three repository VARIABLES (same page → Variables) — none is sensitive: the
 # provider path is inert without the trust binding to THIS repo, and the drive

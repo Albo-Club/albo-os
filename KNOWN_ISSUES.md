@@ -5894,6 +5894,79 @@ bandwidth_, triée décroissante. Elle nomme le coupable en une minute.
 
 ---
 
+## `convex export` lit chaque composant — et facture chaque octet
+
+Un export instantané (`convex export`, le backup du dashboard) lit le
+déploiement **entier**, composants compris, et Convex compte ces lectures dans
+« Database I/O » comme n'importe quelle requête. Le CLI n'a **aucune option**
+pour exclure une table ou un composant (`--path`, `--include-file-storage`,
+`--prod`, `--deployment`, c'est tout).
+
+Le cas vécu (9 → 17 septembre 2026) : le backup nocturne mis en place par
+ALB-234 lançait `convex export --prod` chaque nuit. Les tables applicatives
+pèsent ~200 Mo ; le composant **RAG** en pèse ~5 Go (4 096 flottants par
+chunk, et chaque version remplacée conservée — section suivante). Chaque nuit
+lisait donc ~5 Go pour sauvegarder 200 Mo : **42 Go en huit nuits, 83 % du
+Database I/O du mois**, le plafond de dépenses atteint et la prod coupée. Le
+dashboard nomme le coupable en une ligne : Usage → Breakdown by function →
+`rag/HTTP _system_job/snapshot_export`. Aggravant : le déploiement est en
+région **EU**, donc aucun volume inclus et +30 % — chaque octet lu est
+facturé.
+
+Les embeddings sont **dérivables** (`vectorize:backfillAll` les recalcule
+depuis les documents) : ils n'ont rien à faire dans une sauvegarde. Le remède
+n'est pas « exporter moins souvent » (5 Go par semaine restent 5 Go pour
+rien), c'est **ne plus passer par `convex export`** : le backup pagine les
+tables du schéma applicatif via `migrations/backupExport` (`scanPage`, borné
+en **octets** par page grâce à `maximumBytesRead`, et pas seulement en lignes
+— `inboundEmails` porte jusqu'à 500 Ko par ligne) et écrit la même
+arborescence qu'un export du dashboard (`<table>/documents.jsonl`,
+`_storage/…`), pour que `convex import` continue de la lire.
+
+Ce que l'archive **ne contient plus**, assumé : les tables des composants.
+Le RAG se reconstruit ; les fils du chat de l'agent sont perdus à la
+restauration ; les sessions Better Auth aussi (l'utilisateur se reconnecte,
+`provisionAppUser` retrouve sa ligne `users` par e-mail) ; la file Resend et
+le rate limiter sont transitoires.
+
+Le réflexe : avant de brancher un outil « boîte noire » sur la base (export,
+backup, réplication, audit), regarder ce qu'il **lit** et non ce qu'il écrit
+— et le dashboard Usage, le lendemain du premier run, dit si la facture suit.
+
+---
+
+## Le composant RAG garde chaque version remplacée
+
+`@convex-dev/rag` ne supprime **jamais** une entrée de lui-même. Ré-ajouter
+une clé (`doc:<id>`, `report:<id>`) crée une nouvelle entrée, promeut la
+nouvelle en `ready` et marque l'ancienne `replaced` — et l'ancienne reste là,
+chunks **et** embeddings, tant que l'app ne l'efface pas. La doc du composant
+le dit, sur un exemple de cron `deleteOldContent` ; personne ne l'avait
+branché.
+
+Or l'ingestion remplace souvent : une re-extraction (`documents:reextract`),
+un report renvoyé pour la même période, et surtout chaque re-run de
+`vectorize:backfillAll` sur une org déjà indexée. Chaque passage empilait une
+copie complète du corpus qu'aucune recherche ne lit (`search` ne voit que
+`ready`), invisible dans l'app, et lue en entier par chaque `convex export`
+(section précédente).
+
+Le remède est `vectorize:cleanupReplacedEntries` : une `internalMutation`
+paginée qui liste `status: 'replaced'` sur **tous** les namespaces, efface
+via `rag.deleteAsync` tout ce qui a plus d'une heure (le délai de grâce
+couvre une recherche en cours au moment du remplacement, pas davantage), et
+se replanifie tant que le listing n'est pas épuisé — un seul appel purge tout
+l'arriéré. Le cron horaire du même nom la maintient ensuite à zéro ; sur une
+base propre elle ne lit rien.
+
+Le réflexe : un composant qui **remplace** (upsert par clé, versions) doit
+dire ce qu'il fait des versions précédentes, et si la réponse est « rien »,
+le cron de nettoyage se branche **le jour où on adopte le composant**, pas le
+jour où la facture arrive. Vérification : Convex → Data → composant `rag` →
+table `entries`, aucune ligne `status.kind = replaced` de plus d'une heure.
+
+---
+
 ## Un état d'attente que personne ne balaie (`documents.ocrState: 'pending'`)
 
 `documentsExtract.run` est écrit comme un monde clos : quelle que soit l'issue

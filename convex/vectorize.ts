@@ -459,8 +459,7 @@ export const indexReport = internalAction({
       await ctx.runMutation(internal.vectorize.notifyIndexFailure, {
         orgId: found.report.orgId,
         companyId: found.report.companyId,
-        itemLabel:
-          found.report.title ?? found.report.subject ?? 'Report',
+        itemLabel: found.report.title ?? found.report.subject ?? 'Report',
         detail: failure.detail,
       })
     }
@@ -776,5 +775,58 @@ export const backfillAll = internalAction({
       if (summary.includes('STOPPED')) break
     }
     return summaries
+  },
+})
+
+// ─── Replaced entries cleanup ────────────────────────────────────────────────
+
+/**
+ * How long a replaced entry stays before it is deleted. A search that was
+ * running when the replacement landed may still hold the old chunks; an hour
+ * is far more than any request lives. Not a retention: the replaced version
+ * is never read again once the new one is 'ready'.
+ */
+const REPLACED_GRACE_MS = 60 * 60 * 1000
+
+/** Entries examined per mutation — each deletion is queued, not run here. */
+const CLEANUP_PAGE = 100
+
+/**
+ * Delete the RAG entries an ingestion has replaced. Re-adding a key (a
+ * re-extraction, a backfill re-run, a report re-sent for the same period)
+ * marks the previous entry 'replaced' — and the component leaves it there,
+ * chunks and 4096-float embeddings included, until the app deletes it. It
+ * never did, so every re-index stacked a full copy of the corpus that no
+ * search reads and that every snapshot export paid for (cf. KNOWN_ISSUES.md
+ * « Le composant RAG garde chaque version remplacée »).
+ *
+ * Walks every namespace in pages and schedules itself until the listing is
+ * exhausted, so one call clears the whole backlog; the hourly cron keeps it
+ * at zero afterwards. On a clean deployment the listing reads nothing.
+ */
+export const cleanupReplacedEntries = internalMutation({
+  args: { cursor: v.optional(v.string()) },
+  handler: async (ctx, { cursor }) => {
+    const { page, isDone, continueCursor } = await rag.list(ctx, {
+      status: 'replaced',
+      paginationOpts: { cursor: cursor ?? null, numItems: CLEANUP_PAGE },
+    })
+    const cutoff = Date.now() - REPLACED_GRACE_MS
+    let deleted = 0
+    for (const entry of page) {
+      if (entry.status !== 'replaced' || entry.replacedAt > cutoff) continue
+      await rag.deleteAsync(ctx, { entryId: entry.entryId })
+      deleted++
+    }
+    if (!isDone) {
+      await ctx.scheduler.runAfter(
+        0,
+        internal.vectorize.cleanupReplacedEntries,
+        {
+          cursor: continueCursor,
+        },
+      )
+    }
+    return { deleted, done: isDone }
   },
 })

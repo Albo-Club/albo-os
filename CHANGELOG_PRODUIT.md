@@ -23,6 +23,46 @@ bas de page.
 
 ---
 
+## v1.236.1 — 17/09/2026 à 13:10 — La sauvegarde nocturne ne lit plus toute la base
+
+Le compteur de lectures Convex a explosé depuis le 9 septembre (51 Go en
+onze jours, la prod coupée sur plafond de dépenses) : la sauvegarde
+automatique de chaque nuit lisait le déploiement entier, y compris les
+vecteurs de la recherche sémantique — cinq gigaoctets recalculables, pour
+deux cents mégaoctets de données utiles. Deux corrections, rien de visible
+dans l'app :
+
+- **La sauvegarde ne lit plus que les données de l'application.** L'archive
+  garde le même contenu utile et la même rotation ; la recherche sémantique,
+  qui se reconstruit depuis les documents, n'en fait plus partie. Lecture par
+  nuit divisée par vingt-cinq.
+- **Les anciennes versions de l'index de recherche sont purgées.** Chaque
+  ré-indexation d'un document en laissait une copie que rien ne lisait plus ;
+  un nettoyage horaire les efface désormais, et un premier passage vide
+  l'arriéré.
+
+> **🔧 Notes techniques**
+>
+> - Cause : `convex export --prod` (backup ALB-234, cron GitHub) lit tous les
+>   composants, dont `rag` (~5 Go : embeddings 4096-d + versions `replaced`
+>   jamais supprimées) — `rag/HTTP _system_job/snapshot_export` = 42,7 Go sur
+>   51,6 dans Usage. Le CLI ne sait pas exclure un composant.
+> - `convex/migrations/backupExport.ts` : `listTables` (depuis
+>   `schema.tables`), `scanPage` (pagination bornée par `maximumBytesRead`
+>   4 Mio) et `listFilesPage` (`_storage` + URL de téléchargement) ; boucle
+>   dans `scripts/lib/backup-export.mjs` (ports `runQuery` / `download`
+>   injectés, testée dans `tests/backupExport.test.ts`), branchée dans
+>   `scripts/convex-backup.mjs` à la place de `convex export`, arborescence
+>   d'un export dashboard (`<table>/documents.jsonl`, `_storage/…`), zip via
+>   `zip -r -X`. Vérification/upload/rétention inchangés.
+> - `convex/vectorize.ts` : `cleanupReplacedEntries` (`rag.list` `replaced`
+>   sur tous les namespaces, `rag.deleteAsync` au-delà d'1 h de grâce,
+>   replanification par page) + cron horaire dans `convex/crons.ts`.
+> - À faire côté prod : recréer la clé `CONVEX_DEPLOY_KEY` (elle doit exécuter
+>   des fonctions, plus l'API Backups), lancer une fois
+>   `vectorize:cleanupReplacedEntries`, réactiver le workflow. Runbook dans
+>   `MIGRATIONS.md`, gotchas dans `KNOWN_ISSUES.md`.
+
 ## v1.236.0 — 16/09/2026 à 11:47 — Créer une organisation depuis l'app, et une file de rapports cloisonnée
 
 Le sélecteur d'organisation, en haut de la barre latérale, gagne une entrée

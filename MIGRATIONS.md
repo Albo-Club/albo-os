@@ -66,6 +66,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Doublons de transactions d'un compte connecté deux fois (**destructif**) | `convex/migrations/dedupPowensTransactions.ts` → `dryRun` / `apply` / `verify` | Supprime les copies surnuméraires livrées par une **seconde** connexion Powens vivante sur le même compte (chaque accès a ses propres `powensTxId`, donc la dédup d'ingestion ne les voyait pas). **Un compte à la fois** (`bankAccountId` en argument) : un doublon parfait existe aussi pour de vrai — deux virements identiques le même jour — donc une passe globale détruirait du réel. Ne regarde que les lignes `source: 'powens'`. Survit : la ligne **pointée par une autre** (`matchingDecisions`, `forecastEntries`), sinon celle qui porte une **décision**, sinon la plus ancienne ; deux lignes pointées, ou deux décisions **différentes**, laissent le groupe intact pour arbitrage humain. `apply` exige le nombre de suppressions annoncé par `dryRun` (`plan_changed` sinon) — impossible d'appliquer un plan qu'on n'a pas lu. Idempotente. La fuite elle-même est fermée à la source depuis 09/2026 (`duplicate_live_connection`, cf. `KNOWN_ISSUES.md`). Runbook en tête du module. |
 | Purge des fichiers orphelins (**destructif**) | `convex/migrations/storagePurge.ts` (`deleteOrphans`) + `node scripts/storage-purge.mjs` | Supprime les blobs du file storage que **plus rien** ne référence — 501 Mo, 28 % du stockage au 11/09/2026, dont 564 sur 565 étaient le sosie exact d'un fichier encore présent ailleurs (on ne perd donc aucun octet unique). **Lancer d'abord le correctif de la source** : ces copies venaient du proxy de téléchargement Parallel, qui en déposait une par clic sans jamais l'effacer (corrigé le 11/09/2026) — purger une fuite qui coule encore n'achète que quelques semaines. **Ordre** : `pnpm exec convex export --prod --include-file-storage --path ./avant-purge-$(date +%Y%m%d-%H%M).zip` → `node scripts/storage-purge.mjs` (à blanc, lit le compte et le poids) → `--apply`. ⚠️ **`--include-file-storage` n'est pas optionnel ici, et `--path` non plus.** Sans `--path` la commande **échoue** (et si les lignes sont collées d'un bloc, la purge s'exécute quand même derrière l'échec — c'est arrivé le 11/09/2026). Sans `--include-file-storage`, l'export ne contient **aucun fichier** : le filet ne rattrape pas ce que cette purge supprime. Vérifier que le `.zip` existe et pèse plus que la base avant de lancer `--apply`. Idempotent : un second passage ne trouve plus rien. **Deux planchers, tous deux re-vérifiés côté serveur** parce que le balayage a fini depuis plusieurs minutes : aucun fichier de moins de 24 h (un upload dépose ses octets AVANT la ligne qui les désigne, donc un blob frais sans porteur est un envoi en cours, pas un orphelin — c'est le garde-fou qui protège un utilisateur), et aucune ligne `documents` ne l'a réclamé entre-temps. Les quatre autres tables porteuses ne sont pas re-vérifiées, exception raisonnée : chacune ne désigne qu'un blob qu'elle vient de créer, donc aucune ne peut réclamer un blob déjà vieux et sans porteur — cf. `KNOWN_ISSUES.md`. Le texte extrait (`documentTexts`) part avec le fichier. |
 | Véhicule en tête de nom de fiche (org `calte`) | `convex/migrations/renameSideVehicles.ts` → `dryRun` / `apply` / `report` | Déplace le véhicule en **fin** de nom, entre parenthèses : `SIDE  TIMELEFT` → `TIMELEFT (SIDE)`. 48 fiches (SIDE, ASTERION, plus `SPACELY STOCKAGE (STOCKOSS)`). Le rattachement d'un report cherche le nom de la fiche **en entier** dans le mail et ignore la parenthèse finale (`convex/lib/emailIdentify.ts`) : tant que le véhicule était devant, aucun fondateur n'écrivant « SIDE TIMELEFT », ces participations ne pouvaient se rattacher que par le domaine de l'expéditeur — donc jamais sur un transfert par un tiers. **Ne touche pas** les 8 fiches où le fonds EST la participation (`SIDE 1/2/3`, `SIDE INVEST`, `SIDE Invest 2/3` sur `side-capital.com`, `ASTERION F1/F2`) : là, « SIDE » est le nom, pas un préfixe. Ancrage par `_id` prod + garde sur le nom stocké (comparé espaces normalisés — 8 de ces fiches portent un espace double ou final). Idempotent : une fiche déjà renommée est comptée `alreadyRenamed`, une fiche renommée à la main entre-temps est signalée `anchorMismatch` et **pas** réécrite. **Ordre** : `pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip` (vérifier que le `.zip` existe) → `dryRun` (lire la liste from → to) → `apply` → `report`. |
+| Purge des entrées RAG remplacées (**destructif**, sans perte) | `convex/vectorize.ts` → `cleanupReplacedEntries` (+ cron horaire du même nom) | Efface les entrées du composant RAG marquées `replaced` depuis plus d'une heure — chunks et embeddings des versions qu'une ré-indexation a remplacées, qu'aucune recherche ne lit et que le composant ne supprime jamais seul (cf. `KNOWN_ISSUES.md` « Le composant RAG garde chaque version remplacée »). ~5 Go en prod au 17/09/2026, lus en entier par chaque `convex export` de l'ancien backup. **Pas de snapshot préalable** : rien d'unique n'est détruit, une entrée `replaced` se recalcule depuis son document (`vectorize:backfillAll`). Un seul appel suffit — la mutation se replanifie page par page jusqu'à épuisement : `pnpm exec convex run --prod vectorize:cleanupReplacedEntries '{}'`. Idempotente ; le cron la relance chaque heure. Vérifier : Data → composant `rag` → `entries`, plus aucune ligne `replaced` ancienne, et Database Storage en baisse nette sur le dashboard Usage. |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations (la fusion Palatine ci-dessus est
@@ -77,7 +78,25 @@ l'exception : un rattrapage ponctuel de données, pas le flux) — cf. `KNOWN_IS
 Sauvegarde quotidienne de la prod, poussée sur un Drive partagé par le
 workflow `.github/workflows/convex-backup.yml`. Convex ne sait pas exporter
 tout seul vers une destination qu'on choisit (le backup intégré est réservé au
-Pro et plafonne à 7 jours), donc un ordonnanceur externe lance le CLI.
+Pro et plafonne à 7 jours), donc un ordonnanceur externe construit l'archive.
+
+⚠️ L'archive n'est **pas** un `convex export`. Un export instantané lit le
+déploiement entier, composants compris, et chaque octet lu est facturé : les
+embeddings du composant RAG (~5 Go, recalculables) faisaient lire chaque nuit
+25× ce que la sauvegarde protégeait — 42 Go en huit nuits, la prod coupée sur
+plafond de dépenses (cf. `KNOWN_ISSUES.md` « `convex export` lit chaque
+composant »). Depuis le 17/09/2026 le script pagine les **tables du schéma
+applicatif** via `convex run` sur `migrations/backupExport`
+(`listTables` / `scanPage` / `listFilesPage`, boucle dans
+`scripts/lib/backup-export.mjs`) et écrit la même arborescence qu'un export
+du dashboard — `<table>/documents.jsonl`, `_storage/documents.jsonl` + un
+fichier par blob — pour que `convex import` la lise encore. Lecture par nuit :
+~200 Mo au lieu de ~5 Go.
+
+Hors archive, assumé : les tables des **composants**. RAG (se reconstruit par
+`vectorize:backfillAll`), fils du chat de l'agent (perdus à la restauration),
+sessions Better Auth (on se reconnecte, la ligne `users` est retrouvée par
+e-mail), file Resend et rate limiter (transitoires).
 
 ### Ce qui part, et quand
 
@@ -190,34 +209,18 @@ Seule la clé Convex est un secret. Les trois autres sont des **variables** :
 le chemin du provider est inerte sans le lien de confiance vers ce dépôt, et
 le dossier Drive est protégé par l'appartenance, pas par l'obscurité.
 
-⚠️ **Permissions de la clé Convex.** `convex export` passe par l'API Backups,
-pas par une lecture de données : une clé qui ne porte que
-`deployment:data:view` échoue sur
-`You do not have permission to perform this operation (deployment:backups:create)`.
-Cocher :
-
-- `deployment:backups:view`
-- `deployment:backups:create`
-- `deployment:backups:download`
-- `deployment:data:view`
-
-Et **rien d'autre** — surtout pas `backups:delete` ni `backups:import`, qui
-sont destructives et dont une sauvegarde n'a aucun besoin.
-
-La documentation Convex ne dit nulle part quelle permission va avec quelle
-commande, et le CLI ne signale **que la première manquante** : chaque essai
-n'en révèle qu'une, et les permissions d'une clé ne se modifient pas — il faut
-en recréer une. D'où la liste donnée entière : elle a coûté deux runs.
-
-⚠️ **`ExportInProgress` : attendre, ne rien corriger.** Convex n'autorise
-qu'un export à la fois, et un run qui échoue **après** avoir demandé l'export
-en laisse un qui tourne côté serveur — c'est exactement ce que fait une clé
-qui a `backups:create` mais pas `backups:view` : la demande passe, la lecture
-d'état échoue, l'export continue. Le run suivant se prend alors
-`400 Bad Request: ExportInProgress`. Ce n'est pas une erreur de
-configuration : laisser l'export en cours se terminer (quelques minutes sur
-~1,7 Go) et relancer. Le cron quotidien n'y est pas exposé, 24 h suffisant
-largement.
+⚠️ **Permissions de la clé Convex.** L'archive se construit avec
+`convex run` sur des `internalQuery` : la clé doit pouvoir **exécuter des
+fonctions** sur la prod. Les permissions Backups de l'ancien `convex export`
+(`backups:view` / `create` / `download`) ne servent plus à rien — et la clé
+créée le 09/09/2026 avec elles seules **ne suffit pas** : en recréer une
+(les permissions d'une clé ne se modifient pas). La documentation Convex ne
+dit pas quelle permission granulaire couvre `convex run` ; à défaut, une clé
+de déploiement prod standard fait l'affaire. Ne cocher **ni** `backups:delete`
+**ni** `backups:import`, destructives et sans usage ici. Le premier run après
+changement de clé se lance à la main (Actions → Run workflow, **à blanc**
+d'abord : `node scripts/convex-backup.mjs --dry` en local dit tout de suite si
+la clé passe).
 
 ⚠️ **`GDRIVE_BACKUP_FOLDER_ID` est l'identifiant, pas l'URL.** Coller l'URL
 entière est le réflexe naturel ; le script sait désormais en extraire l'id,
@@ -273,6 +276,18 @@ pnpm exec convex import --prod --replace-all ./albo-os-AAAA-MM-JJ-full.zip
 Puis vérifier : l'app répond, les compteurs du tableau de bord sont cohérents,
 et **une fiche société ouvre bien ses documents** — c'est ce dernier point qui
 prouve que le file storage est revenu, pas seulement les lignes.
+
+Puis, parce que l'archive ne contient pas les composants : se reconnecter (les
+sessions Better Auth sont parties), et relancer
+`pnpm exec convex run --prod vectorize:backfillAll '{}'` pour reconstruire la
+recherche sémantique — vide tant que ce n'est pas fait.
+
+⚠️ Le dossier `_storage` de l'archive est écrit **au format présumé** d'un
+export du dashboard (`documents.jsonl` de métadonnées + un fichier nommé par
+son id) : `convex import` d'une `-full` n'a jamais été essayé avec une archive
+produite par ce script. Si l'import refuse les fichiers, les lignes restent
+importables table par table (`convex import --table <t> <t>/documents.jsonl`)
+et les blobs sont là, à ré-uploader. À trancher lors de la répétition à blanc.
 
 **Cas dégradé — remonter à une archive quotidienne.** Une quotidienne ne
 contient **pas** les fichiers : c'est le prix assumé de la cadence. On perd au
