@@ -23,6 +23,26 @@ bas de page.
 
 ---
 
+## v1.236.3 — 17/09/2026 à 15:15 — La purge de l'index de recherche avance une entrée à la fois
+
+Correctif interne : le premier lancement de la purge des anciennes versions
+de l'index de recherche s'est arrêté net, la quantité de données lue d'un
+coup dépassant la limite d'une seule opération. La purge avance désormais
+une entrée à la fois, en arrière-plan, jusqu'au bout. Rien de visible dans
+l'app.
+
+> **🔧 Notes techniques**
+>
+> - `convex/vectorize.ts` `cleanupReplacedEntries` : `numItems: 1` au lieu
+>   de 100. `rag.deleteAsync` supprime synchroniquement jusqu'à 8 Mo de
+>   chunks (+ embeddings + contenu) dans la transaction appelante avant de
+>   mettre le reste en workpool ; cent appels dans une mutation dépassaient
+>   la limite de 16 Mio (`Too many bytes read`, run prod du 17/09/2026).
+>   Une entrée par transaction, replanification par curseur jusqu'à
+>   épuisement.
+> - `MIGRATIONS.md` (ligne de la purge) et `KNOWN_ISSUES.md` (« Le
+>   composant RAG garde chaque version remplacée ») mis à jour.
+
 ## v1.236.2 — 17/09/2026 à 15:10 — Runbook du backup : les deux permissions exactes de la clé
 
 Mise à jour de documentation seule, sans changement dans l'app : le runbook
