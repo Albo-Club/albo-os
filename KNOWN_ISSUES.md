@@ -5952,12 +5952,21 @@ copie complète du corpus qu'aucune recherche ne lit (`search` ne voit que
 (section précédente).
 
 Le remède est `vectorize:cleanupReplacedEntries` : une `internalMutation`
-paginée qui liste `status: 'replaced'` sur **tous** les namespaces, efface
-via `rag.deleteAsync` tout ce qui a plus d'une heure (le délai de grâce
-couvre une recherche en cours au moment du remplacement, pas davantage), et
-se replanifie tant que le listing n'est pas épuisé — un seul appel purge tout
-l'arriéré. Le cron horaire du même nom la maintient ensuite à zéro ; sur une
-base propre elle ne lit rien.
+qui liste `status: 'replaced'` sur **tous** les namespaces, efface via
+`rag.deleteAsync` ce qui a plus d'une heure (le délai de grâce couvre une
+recherche en cours au moment du remplacement, pas davantage), et se
+replanifie tant que le listing n'est pas épuisé — un seul appel purge tout
+l'arriéré, en arrière-plan. Le cron horaire du même nom la maintient ensuite
+à zéro ; sur une base propre elle ne lit rien.
+
+⚠️ **Une entrée par transaction.** `rag.deleteAsync` n'est pas une simple
+mise en file : il efface **dans l'appelant** les premiers chunks de l'entrée
+(chunk + embedding + contenu, lus puis supprimés) jusqu'au budget de 8 Mo
+par transaction du composant, et ne met en file que le reste. Cent appels
+dans une même mutation ont donc dépassé la limite de 16 Mio de lecture au
+premier run réel (17/09/2026, `Too many bytes read in a single function
+execution`). D'où `numItems: 1` : une entrée listée, une effacée, et la
+suivante dans une transaction à part.
 
 Le réflexe : un composant qui **remplace** (upsert par clé, versions) doit
 dire ce qu'il fait des versions précédentes, et si la réponse est « rien »,

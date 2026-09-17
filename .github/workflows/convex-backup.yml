@@ -26,8 +26,9 @@ name: Convex backup
 # the wrong trade.
 #
 # One repository SECRET (Settings → Secrets and variables → Actions → Secrets):
-#   CONVEX_DEPLOY_KEY  prod deploy key (Convex dashboard → prod → Deploy key),
-#                      allowed to run functions — see MIGRATIONS.md
+#   CONVEX_DEPLOY_KEY  prod deploy key (Convex dashboard → prod → Deploy key)
+#                      with `deployment:functions:runInternalQueries` +
+#                      `deployment:data:view` only — see MIGRATIONS.md
 #
 # Three repository VARIABLES (same page → Variables) — none is sensitive: the
 # provider path is inert without the trust binding to THIS repo, and the drive

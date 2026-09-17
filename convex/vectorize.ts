@@ -788,9 +788,6 @@ export const backfillAll = internalAction({
  */
 const REPLACED_GRACE_MS = 60 * 60 * 1000
 
-/** Entries examined per mutation — each deletion is queued, not run here. */
-const CLEANUP_PAGE = 100
-
 /**
  * Delete the RAG entries an ingestion has replaced. Re-adding a key (a
  * re-extraction, a backfill re-run, a report re-sent for the same period)
@@ -800,16 +797,21 @@ const CLEANUP_PAGE = 100
  * search reads and that every snapshot export paid for (cf. KNOWN_ISSUES.md
  * « Le composant RAG garde chaque version remplacée »).
  *
- * Walks every namespace in pages and schedules itself until the listing is
- * exhausted, so one call clears the whole backlog; the hourly cron keeps it
- * at zero afterwards. On a clean deployment the listing reads nothing.
+ * ONE entry per transaction. `rag.deleteAsync` is not a mere enqueue: it
+ * deletes the entry's first chunks synchronously, up to the component's
+ * 8 MB per-transaction budget, and only queues the remainder. A hundred of
+ * them in one mutation blew the 16 MiB read limit on the first prod run
+ * (17/09/2026). So each run lists a single entry, deletes it, and schedules
+ * itself with the cursor until the listing is exhausted — one call still
+ * clears the whole backlog, in the background; the hourly cron keeps it at
+ * zero afterwards. On a clean deployment the listing reads nothing.
  */
 export const cleanupReplacedEntries = internalMutation({
   args: { cursor: v.optional(v.string()) },
   handler: async (ctx, { cursor }) => {
     const { page, isDone, continueCursor } = await rag.list(ctx, {
       status: 'replaced',
-      paginationOpts: { cursor: cursor ?? null, numItems: CLEANUP_PAGE },
+      paginationOpts: { cursor: cursor ?? null, numItems: 1 },
     })
     const cutoff = Date.now() - REPLACED_GRACE_MS
     let deleted = 0
