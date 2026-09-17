@@ -143,14 +143,21 @@ describe('routeRecap — anti-enumeration', () => {
     assert.equal(routeRecap({ kind: 'success', ...stranger }).broadcast, true)
   })
 
-  it('stays silent on anything a stranger sent that was not filed', () => {
-    // No reply AND no alert: with an open address, one problem mail per
-    // unidentified message is the inbox filling up again. The queue holds it.
-    for (const kind of ['duplicate', 'failure', 'quarantine'] as const) {
+  it('alerts the queue handlers when a stranger sent something that was not filed', () => {
+    // No reply to the sender, but the handlers hear about it: nobody else
+    // would notice a stranger's mail stuck in the queue. The spam filter
+    // upstream is what keeps this from flooding the inbox.
+    for (const kind of ['failure', 'quarantine'] as const) {
       const route = routeRecap({ kind, ...stranger })
       assert.equal(route.broadcast, false, `broadcast on ${kind}`)
-      assert.equal(route.alertOthers, false, `alerted on ${kind}`)
+      assert.equal(route.alertOthers, true, `silent on ${kind}`)
     }
+  })
+
+  it('raises no alert on what a stranger sent that is not a problem', () => {
+    // A duplicate is already there; a filed report is announced, not alerted.
+    assert.equal(routeRecap({ kind: 'duplicate', ...stranger }).alertOthers, false)
+    assert.equal(routeRecap({ kind: 'duplicate', ...stranger }).broadcast, false)
     assert.equal(routeRecap({ kind: 'success', ...stranger }).alertOthers, false)
   })
 })

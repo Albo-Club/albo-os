@@ -26,8 +26,9 @@ Transférez l'update reçu, avec ses pièces jointes, à l'adresse dédiée.
 son update directement. Personne n'a besoin d'être déclaré à l'avance : ce
 qui décide qu'un report est rangé, c'est son **contenu**, pas son
 expéditeur. Un mail que le circuit ne sait rattacher à aucune participation
-reste dans la boîte [Rapports entrants](12-vue-consolidee.md), sans email à
-personne.
+reste dans la boîte [Rapports entrants](12-vue-consolidee.md), et les abonnés
+« Problèmes de reports » en sont prévenus par email — sauf s'il a été marqué
+comme spam.
 
 **Ce qui dépend de l'expéditeur, c'est la réponse.** Un accusé de réception
 contient vos montants, vos organisations et des liens vers vos fiches : il
@@ -410,11 +411,14 @@ synchronisations. Le détail du circuit est dans
   la file (tout est activé par défaut). Le dépôt manuel depuis la fiche
   société est l'autre porte d'entrée, réservée aux membres de l'organisation
   de la société.
-- **Le spam ne réveille personne** : l'adresse étant ouverte, un mail que le
-  circuit ne rattache à rien — ou qu'AgentMail marque comme spam — attend
-  dans la boîte Rapports entrants sans déclencher le moindre email. Une
-  alerte par pub reçue remplirait vos boîtes ; la file est faite pour ça, et
-  le point hebdo du lundi la résume.
+- **Le spam ne réveille personne, l'inconnu si** : un mail qu'AgentMail
+  marque comme spam attend dans la boîte Rapports entrants sans déclencher le
+  moindre email — une alerte par pub reçue remplirait vos boîtes. Un mail qui
+  passe ce filtre mais que le circuit ne rattache à rien, quel que soit son
+  expéditeur, vaut une alerte « email en quarantaine » aux abonnés
+  « Problèmes de reports » : c'est le seul moyen d'apprendre qu'un inconnu a
+  écrit à l'adresse, puisque lui ne reçoit jamais rien. Une seule alerte par
+  mail, même retraité plusieurs fois.
 - **Liens Notion** : la page doit être partagée publiquement. Une page
   privée échoue proprement (source ⚠️, reste du mail traité).
 - **Métriques hors catalogue** : visibles dans le récap sous « non

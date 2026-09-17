@@ -23,6 +23,31 @@ bas de page.
 
 ---
 
+## v1.237.0 — 17/09/2026 à 19:00 — Un mail d'inconnu en quarantaine vous prévient
+
+Un mail envoyé à l'adresse de report par quelqu'un qui n'est pas membre, et
+que le circuit ne parvient pas à rattacher à une participation, déclenche
+désormais l'alerte « email en quarantaine » aux abonnés « Problèmes de
+reports » — comme le fait déjà un transfert de membre qui échoue. Jusqu'ici
+il restait dans la file sans prévenir personne, et seul un super-admin
+pouvait l'y voir.
+
+Ce qui ne change pas : l'expéditeur inconnu ne reçoit jamais de réponse, un
+mail marqué spam reste silencieux, et un mail ne produit qu'une alerte quel
+que soit le nombre de retraitements.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportRouting.ts:routeRecap` : la branche non-membre passe
+>   `alertOthers` à `true` pour `failure` et `quarantine` (`duplicate` et
+>   `success` inchangés, `reply` toujours `null`).
+> - Le garde-fou anti-inondation reste en amont : `reportInbox.ingest` ne
+>   planifie pas de `reportNotify.send` pour le spam AgentMail, et
+>   `claimNotify` borne à une alerte par ligne.
+> - `tests/reportRouting.test.ts` : le test « stays silent » devient
+>   « alerts the queue handlers » ; `KNOWN_ISSUES.md` et
+>   `docs/produit/17-reports-par-email.md` mis à jour.
+
 ## v1.236.4 — 17/09/2026 à 18:10 — Un lien vers une vidéo ne bloque plus l'analyse d'un report
 
 Correctif : deux mails « Updates Ouisub » restaient indéfiniment « En

@@ -84,18 +84,23 @@ export function routeRecap({
   // thread. It is announced by `vascoNotify`, never answered here.
   const channel: ReplyChannel =
     origin === 'vasco' ? null : origin === 'upload' ? 'fresh' : 'thread'
-  // Unknown sender: never reply, and never raise an alert either. The report
-  // address is open to the outside — a founder writes to it directly, and so
-  // does the odd stranger — so a problem mail per unidentified message is the
-  // inbox filling up again. What a stranger's mail produces is what it earned:
-  // a filed report is news the organization hears about; anything else waits
-  // in the queue, silently.
+  // Unknown sender: never reply. The report address is open to the outside —
+  // a founder writes to it directly, and so does the odd stranger — and the
+  // sender must never learn whether anyone reads it.
+  //
+  // The queue handlers, however, DO hear about it: a stranger's mail that was
+  // not filed is exactly what nobody would notice otherwise (its sender is
+  // not waiting for an answer, and the row is only visible to super-admins).
+  // The flood guard is upstream, not here: what AgentMail flags as spam never
+  // reaches this routing at all (`reportInbox.ingest`), and `claimNotify`
+  // caps it at one alert per row, replays included. A duplicate is not a
+  // problem, so it stays silent.
   if (!senderIsMember) {
     return {
       reply: null,
       replyChannel: null,
       withQuality: false,
-      alertOthers: false,
+      alertOthers: kind === 'failure' || kind === 'quarantine',
       broadcast: kind === 'success',
     }
   }
