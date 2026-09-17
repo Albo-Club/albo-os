@@ -6147,20 +6147,29 @@ console AgentMail : `report@alboteam.com` dans la **send block list** de
 l'inbox (`Lists`, direction `send`, type `block`). À partir de là aucun mail
 sortant ne peut atteindre le groupe, quelle que soit la régression.
 
-### Corollaire : une adresse ouverte ne peut pas alerter sur tout
+### Corollaire : une adresse ouverte alerte sur l'inconnu, pas sur le spam
 
-Le groupe accepte les mails de n'importe qui, comme `hello@`. Le circuit
-traitait déjà les inconnus en quarantaine **avec** une alerte aux abonnés
-« Problèmes de reports » : avec une adresse ouverte, ça fait un mail d'alerte
-par pub reçue — exactement la boîte qui se remplit qu'on venait de corriger
-(cf. § « `notifiedAt` est un droit de parole »). Donc :
+Le groupe accepte les mails de n'importe qui, comme `hello@`. Le circuit a
+d'abord traité les inconnus en quarantaine **avec** une alerte aux abonnés
+« Problèmes de reports », puis — parce qu'avec une adresse ouverte ça faisait
+un mail d'alerte par pub reçue (cf. § « `notifiedAt` est un droit de
+parole ») — **sans aucune alerte**. Ce second réglage a été retiré à son tour
+le 17/09/2026 : un démarchage automatisé (un agent qui scanne les dépôts
+publics et écrit aux inboxes AgentMail qu'il y trouve) est resté dans la file
+sans que personne ne le sache, et une ligne d'inconnu n'est visible que des
+super-admins. Le silence était le mauvais garde-fou : il cachait l'inconnu
+au lieu de filtrer la pub. Donc (`lib/reportRouting.ts:routeRecap`) :
 
 - un mail d'inconnu qui **se range** est diffusé à l'org (c'est une nouvelle) ;
-- tout le reste — inconnu non identifié, spam — attend dans la file **sans
-  aucun mail**, ni à lui ni à nous.
+- un mail d'inconnu **non identifié ou en échec** vaut une alerte
+  « email en quarantaine » aux abonnés, **jamais** une réponse à l'expéditeur ;
+- le **spam** marqué par AgentMail reste muet : `reportInbox.ingest` ne
+  planifie aucun `reportNotify.send` pour lui, c'est là que vit le
+  garde-fou anti-inondation ; et `claimNotify` borne le reste à une alerte
+  par ligne, retraitements compris.
 
-Ne pas rebrancher une alerte là-dessus. La file est l'endroit où ça se traite,
-et le point hebdo du lundi la résume.
+Si la boîte se remplit malgré ça, la réponse est côté filtre (block list ou
+règle spam AgentMail), pas un retour au silence.
 
 ### Adresses d'envoi des reports : une carte retirée, sa table inerte
 
