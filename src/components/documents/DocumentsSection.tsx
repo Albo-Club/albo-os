@@ -47,8 +47,8 @@ function toDateInput(period: number): string {
 }
 
 /**
- * Documents attached to a loan, a property or a guarantee: list, correct,
- * delete. Filing them is the shared `AddFilesDialog`'s job, here as on a
+ * Documents attached to a loan, a property, a guarantee or a placement deal:
+ * list, correct, delete. Filing them is the shared `AddFilesDialog`'s job, here as on a
  * company fiche — one door, no metadata, the type read from the file.
  *
  * The rest stays deliberately LEANER than the company fiche's own documents
@@ -62,9 +62,9 @@ function toDateInput(period: number): string {
  * company does, the right move is to adopt that surface rather than grow
  * this one into a second copy of it.
  *
- * The caller owns the query and passes `docs` — the three anchors have three
- * different queries, and a hook cannot be called per row of a list (the
- * guarantee case renders one of these per guarantee, inside a dialog).
+ * The caller owns the query and passes `docs` — each anchor has its own
+ * query, and a hook cannot be called per row of a list (the guarantee case
+ * renders one of these per guarantee, inside a dialog).
  *
  * ⚠️ These rows usually carry NO `companyId`, which is exactly why the
  * schema was relaxed for this module: a loan deed has no portfolio company
