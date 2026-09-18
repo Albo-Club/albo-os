@@ -65,5 +65,11 @@
     "empty": "Aucun loyer manquant.",
     "lastRent": "dernier loyer le {{date}}",
     "subtitle": "Ces biens encaissaient un loyer chaque mois, et le mois dernier rien n'est arrivé. Le mois en cours n'est jamais jugé — un loyer du 5 n'est pas en retard le 2. Un bien qui n'a jamais été loué n'apparaît pas ici : il n'y a pas d'habitude à comparer."
+  },
+  "staleStatements": {
+    "title": "Relevés de titres à renouveler",
+    "empty": "Aucun relevé à renouveler.",
+    "lastStatement": "dernier relevé au {{date}}",
+    "subtitle": "Le dernier relevé importé pour cette banque a plus de 90 jours : la valeur des comptes-titres qu'il alimente date d'autant. Une ligne par banque — un relevé couvre tous ses comptes d'un coup. Une banque dont aucun relevé n'a jamais été importé n'apparaît pas ici : il n'y a rien à renouveler."
   }
 }
