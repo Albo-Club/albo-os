@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.238.0 — 18/09/2026 à 11:16 — Le connecteur Claude sait lire un échéancier et poser une garantie
+
+Le connecteur Claude (celui qu'on branche dans claude.ai) ne connaissait du
+passif que la liste des prêts et des garanties. Il sait désormais faire ce
+que l'assistant in-app faisait déjà :
+
+- **Lire un échéancier** de prêt, échéance par échéance autour d'aujourd'hui :
+  capital, intérêts, assurance, capital restant dû après paiement, et le
+  montant réellement débité sur la période. Sur un prêt à taux variable, les
+  échéances postérieures à la dernière révision connue sont signalées comme
+  projetées — le taux futur n'est pas deviné.
+- **Voir ce qu'un placement garantit** : sa valeur du moment, le total nanti
+  dessus et la marge disponible qu'il lui reste — nantissements au profit
+  d'une autre société du groupe compris.
+- **Rattacher une garantie à un prêt** (nantissement, hypothèque, PPD,
+  caution…) et **enregistrer une mainlevée**, qui sort la sûreté du total
+  nanti sans l'effacer de l'historique.
+- **Ajouter une révision de taux** ou **enregistrer un avenant** sur un prêt.
+- **Ajouter une valorisation datée à un deal**, comme on le faisait déjà pour
+  un bien immobilier.
+
+Comme pour les écritures existantes, Claude demande votre accord avant
+chacune de ces cinq écritures et renvoie le lien de la fiche dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - Parité de surface entre les deux façades IA : `convex/agentTools*.ts`
+>   exposait 66 outils quand `convex/mcp/registry.ts` n'en portait que 35.
+>   Sept sont portés ici : `getLoanSchedule`, `getPledgesOnDeal` (lecture),
+>   `createGuarantee`, `releaseGuarantee`, `addLoanRate`, `addLoanAmendment`,
+>   `createValuation` (écriture).
+> - Zéro logique métier nouvelle : chaque outil est un wrapper sur un internal
+>   déjà en place (`internal.agentToolsDebt.*`,
+>   `internal.valuations.createInternal`), donc mêmes contrôles d'appartenance
+>   (`orgIdFor` → `requireOrgMember`) et mêmes refus (`fixed_rate_loan`,
+>   `revolving_no_amendment`, sujet unique de garantie). Pas de changement de
+>   schéma.
+> - Les cinq écritures portent `write: true` — soit
+>   `annotations.readOnlyHint: false`, le seul mécanisme qui fasse demander
+>   confirmation côté MCP (`needsApproval` n'a aucun effet là, cf.
+>   `KNOWN_ISSUES.md` « Serveur MCP distant » point 7). Le garde-fou
+>   `convex/regression.debtWrites.test.ts` couvre les 7 nouveaux outils.
+> - Restent volontairement hors connecteur : pointage, prévisionnel, écritures
+>   de passif (comptes courants, capital) et suppressions.
+
+---
+
 ## v1.237.1 — 18/09/2026 à 11:00 — Ménage : l'ancienne copie du texte des documents
 
 Outil interne, rien de visible dans l'app. Chaque fiche document traînait
@@ -48,6 +95,8 @@ documents dont c'était la seule copie).
 > - Runbook : ligne dans `MIGRATIONS.md` + chantier « retrait du champ
 >   legacy » mis à jour. Le retrait du champ dans le schéma reste une PR de
 >   suivi, une fois la prod à zéro.
+
+---
 
 ## v1.237.0 — 17/09/2026 à 19:00 — Un mail d'inconnu en quarantaine vous prévient
 

@@ -133,9 +133,11 @@ principalement **claude.ai** — pour interroger le portefeuille sans ouvrir
 l'app (« quelle est ma position de trésorerie ? », « liste mes deals
 actifs »).
 
-- **~28 outils de consultation** (deals, fiches sociétés, reportings des
+- **~30 outils de consultation** (deals, fiches sociétés, reportings des
   participations et synthèse IA, comptes, transactions, prévisionnel, passif,
-  valorisations, KPIs, TVA…).
+  valorisations, KPIs, TVA…). Côté dette, l'**échéancier** d'un prêt se lit
+  échéance par échéance (plan et réalisé côte à côte), et un placement nanti
+  rend ce qu'il garantit et la **marge disponible** qu'il lui reste.
 - **La documentation des participations est interrogeable** : pactes
   d'actionnaires, statuts, bulletins de souscription, PV d'assemblée, term
   sheets, comptes annuels, business plans. Une recherche par le sens («
@@ -149,12 +151,14 @@ actifs »).
   questions « comment marche… » — ce sont les pages du menu Documentation,
   identiques pour toutes les organisations, donc les seuls outils, avec la
   liste des organisations, à ne pas demander laquelle.
-- **7 outils d'écriture** : créer une société du portefeuille, créer un deal,
+- **12 outils d'écriture** : créer une société du portefeuille, créer un deal,
   compléter une société existante, compléter un deal existant, créer un prêt,
-  créer un bien immobilier, ajouter une valorisation à un bien. Ils servent à
-  saisir une entité à partir d'une phrase dictée, sans ouvrir l'app. Tout le
-  reste — suppressions, pointage, prévisionnel, passif — demeure hors de
-  portée du connecteur.
+  créer un bien immobilier, ajouter une valorisation à un bien, ajouter une
+  valorisation à un deal, rattacher une garantie à un prêt, enregistrer une
+  mainlevée, ajouter une révision de taux et enregistrer un avenant. Ils
+  servent à saisir une donnée à partir d'une phrase dictée, sans ouvrir
+  l'app. Tout le reste — suppressions, pointage, prévisionnel, comptes
+  courants — demeure hors de portée du connecteur.
 - **Vous validez chaque écriture** : le connecteur déclare quels outils
   modifient les données, ce qui fait demander votre accord avant l'appel.
   Chaque écriture renvoie le lien de la fiche dans l'app pour relire ou
