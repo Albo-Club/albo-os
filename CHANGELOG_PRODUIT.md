@@ -23,6 +23,74 @@ bas de page.
 
 ---
 
+## v1.245.0 — 18/09/2026 à 22:40 — Banques cloisonnées par défaut, liens entre organisations déclarés
+
+Jusqu'ici, l'app décidait toute seule qu'un compte Palatine était forcément
+à CALTE et qu'un compte Mémo Bank était forcément à Albo Club : une liste
+écrite en dur. Conséquence : une autre société — une filiale avec son propre
+accès, ou quelqu'un d'extérieur — qui connectait l'une de ces banques faisait
+échouer la synchronisation, et Powens cessait d'envoyer les données. Et cette
+liste ne savait rien du vrai besoin : l'accès Palatine de CALTE porte aussi
+les comptes des SCI.
+
+**Plus aucune banque ni société n'est connue à l'avance.** Chaque
+organisation connecte ses banques, et ses comptes arrivent chez elle, sous sa
+société racine, au nom que la banque leur donne. Par défaut, tout est
+étanche : une société extérieure qui connecte la même banque que vous ne
+croise jamais vos données.
+
+**Un lien entre organisations, déclaré une fois.** Dans Réglages →
+Intégrations, une nouvelle carte « Liens entre organisations » permet à un
+administrateur des deux sociétés de déclarer que « les connexions bancaires de
+CALTE peuvent alimenter les comptes de SCI Chapelle ». Le lien est visible des
+deux côtés et se retire au même endroit — sauf tant qu'un compte en dépend
+encore. C'est la même logique que le passif entre deux sociétés du groupe :
+une seule déclaration, lisible des deux côtés.
+
+**Le rattachement d'un compte s'appuie sur ce lien.** Sur la page d'un compte
+connecté, « Rattacher à une autre société » ne propose plus que les sociétés
+liées à celle-ci ; sans lien, le dialog l'explique et renvoie vers les
+réglages. Rien n'est routé automatiquement : le compte arrive chez celui qui
+détient l'accès bancaire, puis un humain le rattache.
+
+> **🔧 Notes techniques**
+>
+> - Nouvelle table `powensFeedGrants` (`feedOrgId` → `hostOrgId`, index
+>   `by_feed` / `by_host` / `by_feed_and_host`) et module `convex/feedGrants.ts`
+>   (`list` lecture des deux sens, `create` admin des deux orgs + `same_org` +
+>   `already_linked`, `remove` refusé `grant_in_use:N` tant qu'un compte de
+>   l'org hôte est alimenté par une connexion de l'org qui alimente). Helpers
+>   de lecture dans `convex/lib/feedGrants.ts` (`hasFeedGrant`, `hostOrgsOf`,
+>   `feedOrgOfAccount`).
+> - `convex/powens.ts` : suppression de `CONNECTOR_OWNER`, `matchConnector`,
+>   `resolveGroupCompany` et du `throw connector_org_mismatch`. Un compte neuf
+>   naît sous `orgRootCompany` avec `bankName = connectorName`. L'écriture
+>   hors org passe par `hasFeedGrant` (branche « déjà lié »), les candidats de
+>   la reprise de lien couvrent les orgs de `hostOrgsOf`. Le scan « untracked »
+>   de `listConnections` ne retient qu'une connexion suivie nulle part.
+> - `bankAccounts.powensFeedOrgId` et l'index `by_powens_feed_org` retirés du
+>   schéma (aucune ligne ne le portait en prod : orgs filiales vides).
+>   `cash.moveAccountToOrg` exige le lien pour un compte connecté
+>   (`no_feed_grant`), org d'alimentation dérivée de `powensConnections`.
+>   `connections.listIntegrations` compte les comptes d'une connexion par
+>   `by_powens_connection`.
+> - `matchExistingAccount` compare les banques par inclusion (`sameBank`) :
+>   « Palatine » (Airtable) ↔ « Banque Palatine » (connecteur), plus de
+>   table d'alias.
+> - Front : carte `FeedGrantsCard` dans `settings/integrations.tsx`, filtre
+>   des orgs liées dans `MoveAccountDialog` (`cash.$accountId.tsx`), i18n
+>   `settings:integrations.links.*` et `cash:move.noLink` /
+>   `errors.no_feed_grant`.
+> - Tests : `regression.powensCrossOrg.test.ts` réécrit autour des liens
+>   (admin des deux côtés, lecture des deux sens, retrait refusé en usage,
+>   move sans lien refusé, reconnexion sans lien ne reprend pas un compte au
+>   même IBAN), `regression.powensNewBank.test.ts` « second org sealed from
+>   the first », cas `sameBank` dans `tests/powensAccounts.test.ts`.
+> - Pas d'outil agent ni MCP : un lien est un réglage de sécurité admin, hors
+>   des deux façades IA (décision explicite).
+
+---
+
 ## v1.244.1 — 18/09/2026 à 21:28 — Un seul ⋯ par page dans Investissements
 
 Le réglage des sous-sections rejoint le menu ⋯ **en haut de la page**, sur la

@@ -152,3 +152,43 @@ describe('lone account (rule 3)', () => {
     assert.equal(match, null)
   })
 })
+
+describe('same bank (connector name vs recorded label)', () => {
+  it('matches the connector full name against a short recorded label', () => {
+    // Airtable records say "Palatine"; Powens delivers "Banque Palatine" —
+    // nothing in the code maps one to the other any more.
+    const match = matchExistingAccount(
+      [candidate({ label: 'Nantissement Titres' })],
+      incoming({
+        bankName: 'Banque Palatine',
+        accountName: 'Nantissement Titres',
+        iban: undefined,
+      }),
+    )
+    assert.deepEqual(match, { kind: 'label', id: 'acc1' })
+  })
+
+  it('still needs the label or a lone account: a bank name alone binds nothing', () => {
+    const match = matchExistingAccount(
+      [
+        candidate({ id: 'a', label: 'Compte A' }),
+        candidate({ id: 'b', label: 'Compte B' }),
+      ],
+      incoming({
+        bankName: 'Banque Palatine',
+        accountName: 'Compte C',
+        iban: undefined,
+        soleAccountOfBank: true,
+      }),
+    )
+    assert.equal(match, null)
+  })
+
+  it('does not match a different bank', () => {
+    const match = matchExistingAccount(
+      [candidate({ bankName: 'Natixis', label: 'CTO' })],
+      incoming({ bankName: 'Neuflize OBC', accountName: 'CTO', iban: undefined }),
+    )
+    assert.equal(match, null)
+  })
+})

@@ -26,8 +26,12 @@
  * The Convex runtime does not expose Node's `crypto.timingSafeEqual`;
  * `crypto.subtle.verify` is the constant-time equivalent. Cf. KNOWN_ISSUES.md.
  *
- * Connector → owner entity mapping: new accounts only. Qonto is not in it:
- * it is matched to the existing record (imported from Airtable).
+ * Write scope: the org of the matched Powens user, always. A new account is
+ * created there, under its root company, named after the connector — no
+ * bank name, no company name is hard-coded here. Writing into ANOTHER org
+ * needs a `powensFeedGrants` row (cf. `convex/lib/feedGrants.ts`). Qonto is
+ * never created: it is matched to the existing record (imported from
+ * Airtable).
  */
 
 import { ConvexError, v } from 'convex/values'
@@ -44,6 +48,7 @@ import { RESEND_FROM, resend } from './email'
 import { powensConnectionAlertEmail } from './emailTemplates'
 import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { loadOrgRules, ruleFieldsFor } from './lib/categoryRules'
+import { hasFeedGrant, hostOrgsOf } from './lib/feedGrants'
 import { wantsAlert } from './lib/notificationPrefs'
 import {
   matchExistingAccount,
@@ -57,20 +62,6 @@ import type { MutationCtx, QueryCtx } from './_generated/server'
 /** Must match EXACTLY the path of the webhook URL configured on the Powens
  * side (no trailing slash): the HMAC is computed over it. */
 const WEBHOOK_PATH = '/powens/webhook'
-
-/** Powens connector (normalized name, matched by inclusion) → org + owning
- * `group_*` entity, for the CREATION of a new account. Qonto excluded. */
-const CONNECTOR_OWNER: ReadonlyArray<{
-  match: string
-  orgSlug: string
-  ownerName: string
-  bankName: string
-}> = [
-  { match: 'palatine', orgSlug: 'calte', ownerName: 'CALTE', bankName: 'Palatine' },
-  { match: 'wormser', orgSlug: 'calte', ownerName: 'CALTE', bankName: 'Wormser' },
-  { match: 'neuflize', orgSlug: 'calte', ownerName: 'CALTE', bankName: 'Neuflize' },
-  { match: 'memo', orgSlug: 'albo', ownerName: 'Albo Club', bankName: 'Mémo Bank' },
-]
 
 /** Powens account type → our own `accountKind`. Default: raw Powens type. */
 const ACCOUNT_KIND: Record<string, string> = {
@@ -113,11 +104,6 @@ function parsePowensDateTime(value: unknown): number | undefined {
   return Number.isNaN(ms) ? undefined : ms
 }
 
-function matchConnector(normalizedConnector: string) {
-  return (
-    CONNECTOR_OWNER.find((e) => normalizedConnector.includes(e.match)) ?? null
-  )
-}
 function mapAccountKind(type: string | undefined): string | undefined {
   if (!type) return undefined
   return ACCOUNT_KIND[type] ?? type
@@ -411,26 +397,9 @@ async function orgBySlug(
   return org
 }
 
-async function resolveGroupCompany(
-  ctx: QueryCtx,
-  orgId: Id<'organizations'>,
-  name: string,
-): Promise<Doc<'companies'>> {
-  const target = normalizeName(name)
-  const companies = await ctx.db
-    .query('companies')
-    .withIndex('by_org', (q) => q.eq('orgId', orgId))
-    .collect()
-  const found = companies.find((c) => normalizeName(c.name) === target)
-  if (!found) throw new ConvexError(`group_company_not_found:${name}`)
-  if (!found.kind.startsWith('group_')) {
-    throw new ConvexError(`owner_not_group_entity:${name}`)
-  }
-  return found
-}
-
-/** The `group_root` company of an org — the owner a new account falls back
- * to when its connector is not mapped. Every org has exactly one. */
+/** The `group_root` company of an org — the owner every new account is
+ * created under, until an admin attaches it to its real company. Every org
+ * has exactly one. */
 async function orgRootCompany(
   ctx: QueryCtx,
   orgId: Id<'organizations'>,
@@ -549,9 +518,8 @@ async function takeOverAccount(
  * `null` if the account must be ignored.
  *
  * `org` = the org of the matched Powens user (source of truth for "who owns
- * this connection"): it is what scopes the write. The connector→entity
- * mapping only picks the owning entity and must agree with this org
- * (otherwise a visible error, no silent write).
+ * this connection"): it is what scopes the write. The only way out of it is
+ * a `powensFeedGrants` row naming the org the account lives in.
  *
  * `siblings` = every account of the same payload, needed to tell a lone
  * account of a bank from one of several (cf. `matchExistingAccount`).
@@ -574,10 +542,10 @@ async function resolveAccount(
     .first()
   if (linked) {
     // Consistency: the linked account belongs to the Powens user's org, OR
-    // it was deliberately attached to another org while staying fed from
-    // here (`cash.moveAccountToOrg` stamps `powensFeedOrgId`). Without that
-    // stamp, a Powens user never writes outside its own org.
-    if (linked.orgId !== org._id && linked.powensFeedOrgId !== org._id) {
+    // that org was granted the right to feed the account's org
+    // (`powensFeedGrants`, declared by an admin of both). Without a grant, a
+    // Powens user never writes outside its own org.
+    if (!(await hasFeedGrant(ctx, org._id, linked.orgId))) {
       console.warn(
         `[powens] compte acct ${acc.powensAccountId} déjà lié à une autre org ` +
           `que celle du user Powens (${org.slug}) — ignoré`,
@@ -599,25 +567,23 @@ async function resolveAccount(
   }
 
   const connector = normalizeName(acc.connectorName)
-  const mapping = matchConnector(connector)
-  const bankName = mapping?.bankName ?? acc.connectorName
 
   // 2. Same real account already recorded, under other ids (reconnection) or
   // not yet linked (record imported from Airtable) → take over the link
   // instead of creating a second row for the same bank.
-  // Candidates: the org's own accounts PLUS those it feeds in another org.
-  // A reconnection hands out new account ids, so a moved account has to stay
-  // recognizable here — otherwise it would be duplicated back into this org.
-  const candidates = [
-    ...(await ctx.db
-      .query('bankAccounts')
-      .withIndex('by_org', (q) => q.eq('orgId', org._id))
-      .collect()),
-    ...(await ctx.db
-      .query('bankAccounts')
-      .withIndex('by_powens_feed_org', (q) => q.eq('powensFeedOrgId', org._id))
-      .collect()),
-  ]
+  // Candidates: the org's own accounts PLUS those of every org it is granted
+  // to feed. A reconnection hands out new account ids, so an account attached
+  // to a granted org has to stay recognizable here — otherwise it would be
+  // duplicated back into this org.
+  const candidates: Array<Doc<'bankAccounts'>> = []
+  for (const orgId of [org._id, ...(await hostOrgsOf(ctx, org._id))]) {
+    candidates.push(
+      ...(await ctx.db
+        .query('bankAccounts')
+        .withIndex('by_org', (q) => q.eq('orgId', orgId))
+        .collect()),
+    )
+  }
   const match = matchExistingAccount(
     candidates.map((a) => ({
       id: a._id,
@@ -629,7 +595,7 @@ async function resolveAccount(
       archivedAt: a.archivedAt,
     })),
     {
-      bankName,
+      bankName: acc.connectorName,
       accountName: acc.accountName,
       iban: acc.iban,
       soleAccountOfBank:
@@ -699,27 +665,19 @@ async function resolveAccount(
   }
 
   // 4. New account, in the org of the Powens user — that org is the source
-  // of truth for the write scope, never the mapping. A MAPPED connector only
-  // names the owning entity and the bank label, and must agree with that org.
-  // An UNMAPPED one is not an error: the account is created under the org's
-  // root company, with the connector's own name, then reattached to its real
+  // of truth for the write scope. The account is created under the org's
+  // root company, with the connector's own name, then attached to its real
   // company by an admin (`cash.moveAccountToOrg`) — the very gesture the
-  // Palatine access already needs for the SCIs it carries. Connecting a new
-  // bank must not require a deploy.
-  if (mapping && mapping.orgSlug !== org.slug) {
-    throw new ConvexError(
-      `connector_org_mismatch:${acc.connectorName}:${org.slug}`,
-    )
-  }
-  const owner = mapping
-    ? await resolveGroupCompany(ctx, org._id, mapping.ownerName)
-    : await orgRootCompany(ctx, org._id)
+  // Palatine access needs for the SCIs it carries. Nothing here knows a bank
+  // or a company by name: connecting a new bank never requires a deploy, and
+  // a third org connecting the same bank as another never meets its accounts.
+  const owner = await orgRootCompany(ctx, org._id)
   const balance = balancePatch(acc)
   const id = await ctx.db.insert('bankAccounts', {
     orgId: org._id,
     ownerCompanyId: owner._id,
-    bankName,
-    label: acc.accountName ?? bankName,
+    bankName: acc.connectorName,
+    label: acc.accountName ?? acc.connectorName,
     iban: acc.iban,
     accountKind: mapAccountKind(acc.accountType),
     currency: acc.currency,
@@ -850,7 +808,7 @@ async function writeAccountTransactions(
 
 /** Accounts currently fed by a connection (archived excluded) — a connection
  * feeding none is a leftover, not an incident. Read by connection and NOT by
- * org: an account it feeds may live in another org (`powensFeedOrgId`), and
+ * org: an account it feeds may live in another org (`powensFeedGrants`), and
  * missing it would turn a healthy connection into an "obsolete" one. */
 async function connectionAccounts(
   ctx: QueryCtx,
@@ -1271,7 +1229,7 @@ export const listConnections = query({
       .collect()
     const now = Date.now()
     // Accounts fed by each connection, read BY CONNECTION: one of them may
-    // be attached to another org (`powensFeedOrgId`) and must still appear
+    // be attached to another org (`powensFeedGrants`) and must still appear
     // under the connection that feeds it — otherwise the connection looks
     // like it feeds nothing, i.e. obsolete.
     const fedByConnection = new Map<string, Array<Doc<'bankAccounts'>>>()
@@ -1331,18 +1289,29 @@ export const listConnections = query({
         (a.connectorName ?? '').localeCompare(b.connectorName ?? ''),
       )
 
-    // Powens-linked accounts whose connection is not tracked, grouped by
-    // bank. `lastSuccessfulSyncAt` falls back to the freshest balance the
+    // Powens-linked accounts whose connection is tracked NOWHERE, grouped by
+    // bank. Tracked by any org, not only this one: an account fed from
+    // another org (`powensFeedGrants`) has its connection monitored there,
+    // and listing it here as untracked would raise a false dead-connection
+    // alarm. `lastSuccessfulSyncAt` falls back to the freshest balance the
     // dead connection ever delivered (best available signal).
-    const trackedIds = new Set(rows.map((r) => r.powensConnectionId))
+    const trackedIds = new Set<string>()
+    for (const a of accounts) {
+      const connectionId = a.powensConnectionId
+      if (!connectionId || trackedIds.has(connectionId)) continue
+      const monitored = await ctx.db
+        .query('powensConnections')
+        .withIndex('by_powens_connection', (q) =>
+          q.eq('powensConnectionId', connectionId),
+        )
+        .unique()
+      if (monitored) trackedIds.add(connectionId)
+    }
     const orphans = accounts.filter(
       (a) =>
         a.powensAccountId &&
         !a.archivedAt &&
         a.accountStatus !== 'closed' &&
-        // Fed from another org: its connection is monitored there, listing
-        // it here as untracked would raise a false dead-connection alarm.
-        (a.powensFeedOrgId == null || a.powensFeedOrgId === orgId) &&
         (!a.powensConnectionId || !trackedIds.has(a.powensConnectionId)),
     )
     const byBank = new Map<string, Array<Doc<'bankAccounts'>>>()

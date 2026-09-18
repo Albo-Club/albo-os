@@ -493,21 +493,24 @@ export const listIntegrations = query({
             .query('powensConnections')
             .withIndex('by_org', (q) => q.eq('orgId', orgId))
             .collect()
-          const bankAccounts = await ctx.db
-            .query('bankAccounts')
-            .withIndex('by_org', (q) => q.eq('orgId', orgId))
-            .collect()
-          item.connections = rows.map((r) => {
+          item.connections = []
+          for (const r of rows) {
             const health = connectionHealth(r, now)
             // A degraded connection feeding no account is a leftover, not an
             // incident: shown as inactive (no reconnect prompt). The delete
             // affordance lives on the Cash page — cf. convex/powens.ts.
-            const fed = bankAccounts.filter(
-              (a) =>
-                !a.archivedAt && a.powensConnectionId === r.powensConnectionId,
-            )
+            // Read BY CONNECTION, not by org: an account it feeds may live in
+            // another org of the group (`powensFeedGrants`).
+            const fed = (
+              await ctx.db
+                .query('bankAccounts')
+                .withIndex('by_powens_connection', (q) =>
+                  q.eq('powensConnectionId', r.powensConnectionId),
+                )
+                .collect()
+            ).filter((a) => !a.archivedAt)
             const feedsAccount = fed.length > 0
-            return {
+            item.connections.push({
               id: r.powensConnectionId,
               label: r.customLabel ?? r.connectorName ?? r.powensConnectionId,
               providerName: r.connectorName,
@@ -516,8 +519,8 @@ export const listIntegrations = query({
                 health !== 'connected' && !feedsAccount ? 'inactive' : health,
               lastConnectedAt: r.lastSuccessfulSyncAt ?? null,
               lastError: r.errorMessage ?? null,
-            }
-          })
+            })
+          }
           break
         }
       }

@@ -41,6 +41,13 @@ import {
 } from '~/components/ui/dialog'
 import { Input } from '~/components/ui/input'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '~/components/ui/select'
+import {
   Field,
   FieldDescription,
   FieldGroup,
@@ -198,8 +205,154 @@ function IntegrationsList({
         orgId={orgId}
         canManage={canManage}
       />
+      <FeedGrantsCard orgId={orgId} canManage={canManage} />
       <McpConnectorCard />
     </div>
+  )
+}
+
+/**
+ * Links between organizations for the bank feed (`powensFeedGrants`): "the
+ * bank connections of this org may feed accounts of that org". Declared once
+ * here, by an admin of both orgs, and read from both sides — the org that
+ * feeds sees whom it feeds, the org that is fed sees by whom. It is what the
+ * « Rattacher » action on an account requires (cf. `cash.moveAccountToOrg`).
+ */
+function FeedGrantsCard({
+  orgId,
+  canManage,
+}: {
+  orgId: Id<'organizations'>
+  canManage: boolean
+}) {
+  const { t } = useTranslation(['settings', 'common'])
+  const grants = useConvexQuery(api.feedGrants.list, { orgId })
+  const me = useConvexQuery(api.users.me)
+  const create = useConvexMutation(api.feedGrants.create)
+  const remove = useConvexMutation(api.feedGrants.remove)
+  const [hostOrgId, setHostOrgId] = useState('')
+  const [pending, setPending] = useState(false)
+
+  // Only the orgs a link can be declared with: admin on both sides, not
+  // this one, not already linked from here.
+  const linked = new Set((grants?.feeding ?? []).map((g) => g.org._id))
+  const candidates =
+    me?.kind === 'ready'
+      ? me.orgs.filter(
+          (o) =>
+            o._id !== orgId &&
+            !linked.has(o._id) &&
+            (o.role === 'owner' || o.role === 'admin'),
+        )
+      : []
+
+  async function handleAdd() {
+    if (!hostOrgId) return
+    setPending(true)
+    try {
+      await create({ feedOrgId: orgId, hostOrgId: hostOrgId as Id<'organizations'> })
+      setHostOrgId('')
+      toast.success(t('settings:integrations.links.toasts.added'))
+    } catch {
+      toast.error(t('settings:integrations.links.toasts.addError'))
+    } finally {
+      setPending(false)
+    }
+  }
+
+  async function handleRemove(grantId: Id<'powensFeedGrants'>) {
+    try {
+      await remove({ grantId })
+      toast.success(t('settings:integrations.links.toasts.removed'))
+    } catch (err) {
+      const code = err instanceof ConvexError ? String(err.data) : ''
+      const inUse = /^grant_in_use:(\d+)$/.exec(code)
+      toast.error(
+        inUse
+          ? t('settings:integrations.links.toasts.inUse', {
+              count: Number(inUse[1]),
+            })
+          : t('settings:integrations.links.toasts.removeError'),
+      )
+    }
+  }
+
+  const rows = [
+    ...(grants?.feeding ?? []).map((g) => ({ ...g, direction: 'feeding' as const })),
+    ...(grants?.fedBy ?? []).map((g) => ({ ...g, direction: 'fedBy' as const })),
+  ]
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          {t('settings:integrations.links.title')}
+          <InfoHint text={t('settings:integrations.links.description')} />
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {rows.length === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            {t('settings:integrations.links.empty')}
+          </p>
+        ) : (
+          <div className="divide-y rounded-lg border">
+            {rows.map((g) => (
+              <div
+                key={g._id}
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-3 py-2"
+              >
+                <span className="flex min-w-0 flex-col text-sm">
+                  <span className="truncate font-medium">{g.org.name}</span>
+                  <span className="text-muted-foreground text-xs">
+                    {t(`settings:integrations.links.${g.direction}`)}
+                  </span>
+                </span>
+                {canManage && (
+                  <Button
+                    size="icon-sm"
+                    variant="ghost"
+                    className="text-muted-foreground"
+                    aria-label={t('common:actions.remove')}
+                    title={t('common:actions.remove')}
+                    onClick={() => void handleRemove(g._id)}
+                  >
+                    <Unlink className="size-4" />
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {canManage && (
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={hostOrgId} onValueChange={setHostOrgId}>
+              <SelectTrigger className="w-64" aria-label={t('settings:integrations.links.addLabel')}>
+                <SelectValue
+                  placeholder={t('settings:integrations.links.addPlaceholder')}
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {candidates.map((o) => (
+                  <SelectItem key={o._id} value={o._id}>
+                    {o.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!hostOrgId || pending}
+              onClick={() => void handleAdd()}
+            >
+              <Link2 className="size-4" />
+              {t('settings:integrations.links.add')}
+            </Button>
+          </div>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

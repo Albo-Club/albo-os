@@ -703,6 +703,29 @@ export default defineSchema({
     .index('by_powens_connection', ['powensConnectionId']),
 
   /**
+   * powensFeedGrants — the ONE declaration that lets the bank connections of
+   * an org feed accounts that belong to another org of the group (a Palatine
+   * access held by CALTE carrying the current accounts of two SCIs). Declared
+   * once by an admin of BOTH orgs (Réglages → Intégrations), readable from
+   * both sides (`by_feed` / `by_host`), never inferred from a bank or
+   * connector name. It is the authorization `powens.ingestConnectionSync`
+   * checks before writing outside the Powens user's own org, and what
+   * `cash.moveAccountToOrg` requires before attaching a Powens-fed account
+   * elsewhere. Without a grant, every org is sealed: a third org connecting
+   * the same bank never meets another org's accounts. Cf. KNOWN_ISSUES.md
+   * « Ingestion Powens ».
+   */
+  powensFeedGrants: defineTable({
+    feedOrgId: v.id('organizations'), // org whose Powens connections feed
+    hostOrgId: v.id('organizations'), // org whose accounts may be fed
+    createdBy: v.id('users'),
+    createdAt: v.number(),
+  })
+    .index('by_feed', ['feedOrgId'])
+    .index('by_host', ['hostOrgId'])
+    .index('by_feed_and_host', ['feedOrgId', 'hostOrgId']),
+
+  /**
    * telegramAccounts — one row per app user bridging their Telegram account
    * to the AI agent (cf. convex/telegram.ts). Linked via a one-shot
    * `linkCode` (CLI runbook `telegram:createLinkCode` + `/start <code>`).
@@ -1924,7 +1947,7 @@ export default defineSchema({
   bankAccounts: defineTable({
     // Org the account BELONGS to. Not necessarily the org holding the Powens
     // connection that feeds it: one bank login can carry the accounts of
-    // several companies of the group (cf. `powensFeedOrgId`).
+    // several companies of the group (cf. `powensFeedGrants`).
     orgId: v.id('organizations'),
     ownerCompanyId: v.id('companies'), // must be a "group_*"
     bankName: v.string(), // "Qonto", "Palatine", "Neuflize", "Wormser"
@@ -1948,12 +1971,6 @@ export default defineSchema({
     balanceAsOf: v.optional(v.number()),
     powensConnectionId: v.optional(v.string()),
     powensAccountId: v.optional(v.string()),
-    // Set ONLY when the account was attached to another org than the one
-    // whose Powens user feeds it (`cash.moveAccountToOrg`). It is the
-    // authorization the ingestion checks: without it, a Powens user may
-    // never write outside its own org. Survives a reconnection, unlike
-    // `powensConnectionId` (new ids at each reconnect).
-    powensFeedOrgId: v.optional(v.id('organizations')),
     // Account number as the bank prints it on its statements ("68425000003").
     // NOT an IBAN: it is what a statement import matches an account on, since
     // a statement never carries the Powens id and rarely the IBAN. Absent on
@@ -1971,11 +1988,8 @@ export default defineSchema({
     .index('by_powens_account', ['powensAccountId'])
     // Accounts fed by one connection — read WITHOUT the org, because an
     // account can be attached to an org other than the one holding the
-    // connection (cf. `cash.moveAccountToOrg`).
+    // connection (cf. `cash.moveAccountToOrg`, `powensFeedGrants`).
     .index('by_powens_connection', ['powensConnectionId'])
-    // Accounts fed by the connections of one org but living elsewhere —
-    // the reconnection takeover has to see them (`matchExistingAccount`).
-    .index('by_powens_feed_org', ['powensFeedOrgId'])
     .index('by_airtable_id', ['airtableId']),
 
   /**

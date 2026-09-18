@@ -2,6 +2,7 @@ import { ConvexError, v } from 'convex/values'
 import { mutation, query } from './_generated/server'
 import { requireOrgMember, requireOrgRole } from './lib/auth'
 import { isListedAccount } from './lib/bankAccounts'
+import { feedOrgOfAccount, hasFeedGrant } from './lib/feedGrants'
 import { normalizeSearch } from './lib/searchText'
 import type { Doc } from './_generated/dataModel'
 
@@ -161,9 +162,10 @@ export const updateAccountName = mutation({
  * owns it there. One bank login can carry the accounts of several companies
  * (a Palatine access holding the current accounts of two SCIs): the Powens
  * connection stays with the org that holds the login, while each account goes
- * to its own company. `powensFeedOrgId` records that authorization — it is
- * what lets the ingestion keep writing from the other org (convex/powens.ts),
- * and unlike `powensConnectionId` it survives a reconnection.
+ * to its own company. For a Powens-fed account this needs a link between the
+ * two orgs (`powensFeedGrants`, Réglages → Intégrations): it is what lets the
+ * ingestion keep writing from the feed org (convex/powens.ts), and it is
+ * declared on the orgs, so it survives a reconnection.
  *
  * Refused as soon as the account is tied to something in its current org (a
  * matched transaction, a placement, a loan's direct-debit account): moving it
@@ -193,6 +195,16 @@ export const moveAccountToOrg = mutation({
     if (!owner.kind.startsWith('group_')) {
       throw new ConvexError('owner_not_group_entity')
     }
+    // A Powens-fed account may only leave the org whose connection feeds it
+    // for an org that connection is granted to feed. Coming back to the feed
+    // org needs nothing. An account whose connection is tracked nowhere is
+    // fed from where it lives, as far as anyone can tell.
+    if (account.powensAccountId != null) {
+      const feedOrgId = (await feedOrgOfAccount(ctx, account)) ?? account.orgId
+      if (!(await hasFeedGrant(ctx, feedOrgId, targetOrgId))) {
+        throw new ConvexError('no_feed_grant')
+      }
+    }
 
     const transactions = await ctx.db
       .query('transactions')
@@ -219,13 +231,6 @@ export const moveAccountToOrg = mutation({
     await ctx.db.patch('bankAccounts', bankAccountId, {
       orgId: targetOrgId,
       ownerCompanyId,
-      // Which org's Powens user may keep feeding this account. Cleared when
-      // the account comes back home, or when nothing feeds it.
-      powensFeedOrgId:
-        account.powensAccountId == null ||
-        (account.powensFeedOrgId ?? account.orgId) === targetOrgId
-          ? undefined
-          : (account.powensFeedOrgId ?? account.orgId),
     })
     for (const tx of transactions) {
       await ctx.db.patch('transactions', tx._id, { orgId: targetOrgId })
