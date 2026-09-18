@@ -182,36 +182,49 @@ export const getOwnershipForCompany = query({
     await requireOrgMember(ctx, orgId)
     const company = await ctx.db.get('companies', companyId)
     if (!company || company.orgId !== orgId) throw new ConvexError('not_found')
-    if (!company.siren) return null
-
-    // Bounded by the number of positions this org holds elsewhere — a
-    // handful, not a table scan.
-    const held = await ctx.db
-      .query('equityPositions')
-      .withIndex('by_holder_org', (q) => q.eq('holderOrgId', orgId))
-      .collect()
-
-    for (const position of held) {
-      if (position.ownershipBps == null) continue
-      const root = await ctx.db
-        .query('companies')
-        .withIndex('by_org_kind', (q) =>
-          q.eq('orgId', position.orgId).eq('kind', 'group_root'),
-        )
-        .first()
-      if (!root || root.siren !== company.siren) continue
-      const issuer = await ctx.db.get('organizations', position.orgId)
-      return {
-        ownershipBps: position.ownershipBps,
-        positionId: position._id,
-        issuingOrgSlug: issuer?.slug ?? null,
-        issuingOrgName: issuer?.name ?? null,
-        effectiveDate: position.effectiveDate,
-      }
-    }
-    return null
+    return await ownershipForCompany(ctx, orgId, company)
   },
 })
+
+/**
+ * The cap-table lookup behind `getOwnershipForCompany`, shared with the
+ * agent / MCP deal read (`agentTools.getDealInternal`) so the connector
+ * answers the same figure as the company sheet. Callers own the auth check.
+ */
+export async function ownershipForCompany(
+  ctx: QueryCtx,
+  orgId: Id<'organizations'>,
+  company: Doc<'companies'>,
+) {
+  if (!company.siren) return null
+
+  // Bounded by the number of positions this org holds elsewhere — a
+  // handful, not a table scan.
+  const held = await ctx.db
+    .query('equityPositions')
+    .withIndex('by_holder_org', (q) => q.eq('holderOrgId', orgId))
+    .collect()
+
+  for (const position of held) {
+    if (position.ownershipBps == null) continue
+    const root = await ctx.db
+      .query('companies')
+      .withIndex('by_org_kind', (q) =>
+        q.eq('orgId', position.orgId).eq('kind', 'group_root'),
+      )
+      .first()
+    if (!root || root.siren !== company.siren) continue
+    const issuer = await ctx.db.get('organizations', position.orgId)
+    return {
+      ownershipBps: position.ownershipBps,
+      positionId: position._id,
+      issuingOrgSlug: issuer?.slug ?? null,
+      issuingOrgName: issuer?.name ?? null,
+      effectiveDate: position.effectiveDate,
+    }
+  }
+  return null
+}
 
 /**
  * An org's liabilities: issued equity positions + the inter-entity current

@@ -23,6 +23,52 @@ bas de page.
 
 ---
 
+## v1.239.0 — 18/09/2026 à 13:35 — L'assistant et le connecteur Claude lisent la fiche complète d'un deal et le % de détention
+
+Jusqu'ici, l'assistant in-app et le connecteur Claude ne voyaient d'un deal
+que l'essentiel : investisseur, cible, instrument, montants et statut. Les
+termes de l'instrument — et surtout le **pourcentage de détention** — leur
+restaient invisibles, alors qu'ils étaient bien saisis dans l'app.
+
+- **Fiche complète d'un deal** : un nouvel outil rend toute la ligne —
+  actions et prix par action, tour et valorisations pré/post-money, taux,
+  échéance et principal d'une dette, cap et décote d'un BSA Air, part dans
+  un SPV, termes d'un fonds, bons de souscription, immobilier, placement —
+  ainsi que les noms de l'investisseur, de la cible et du SPV, et la
+  performance réalisée.
+- **Le % de détention, avec sa provenance** : la fiche indique la part que
+  l'organisation tient à travers ce deal et d'où elle vient — la table de
+  capitalisation de la filiale quand la cible en est une (le même chiffre
+  que l'en-tête de la fiche société), sinon la part saisie sur le deal,
+  sinon le ratio actions acquises / capital de la société.
+- **La liste des deals** porte désormais le libellé personnalisé et la part
+  saisie sur chaque deal, sans avoir à ouvrir chaque fiche.
+- **Le passif** rend la part de chaque détenteur au capital et
+  l'organisation détentrice quand c'est une société du groupe.
+
+> **🔧 Notes techniques**
+>
+> - `convex/agentTools.ts` : nouvel internal `getDealInternal` (ligne `deals`
+>   entière moins `orgId`, `airtableId`, `manuallyEditedFields`, `bpPoints`,
+>   `actualPoints` ; noms résolus ; `dealRealizedMetrics` ; bloc `ownership
+>   {bps, source}` résolu cap table > `ownershipPct` > ratio
+>   `sharesAcquired / totalShares`), outil in-app `getDeal`, et `name` +
+>   `ownershipPct` ajoutés à `listDealsInternal`.
+> - `convex/liabilities.ts` : la recherche de cap table de
+>   `getOwnershipForCompany` est extraite en helper `ownershipForCompany`
+>   (même logique SPEC D33, lecture par SIREN via `by_holder_org`) pour que
+>   la fiche deal agent/MCP rende le même % que la fiche société.
+> - `convex/mcp/registry.ts` : outil `getDeal` (lecture, `readOnlyHint:
+>   true`) — 43 outils ; descriptions de `listDeals` et `listLiabilities`
+>   mises à jour. `convex/agentToolsLiabilities.ts` :
+>   `listLiabilitiesInternal` expose `ownershipBps` et `holderOrgSlug`.
+>   `convex/lib/instructions.ts` : le contexte « fiche deal » pointe `getDeal`.
+> - Garde-fou `convex/regression.dealRead.test.ts` : présence sur les deux
+>   façades, ligne entière sans colonnes techniques, les trois sources du %,
+>   cap table de l'émettrice côté passif, deal d'une autre org refusé.
+
+---
+
 ## v1.238.0 — 18/09/2026 à 11:16 — Le connecteur Claude sait lire un échéancier et poser une garantie
 
 Le connecteur Claude (celui qu'on branche dans claude.ai) ne connaissait du

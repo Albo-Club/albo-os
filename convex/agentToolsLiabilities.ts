@@ -46,14 +46,23 @@ export const listLiabilitiesInternal = internalQuery({
     await readMembership(ctx, orgId, actorUserId)
     const { equityPositions, loans } = await getLiabilitiesForOrg(ctx, orgId)
     return {
-      equityPositions: equityPositions.map((position) => ({
-        _id: position._id,
-        type: position.type,
-        holderName: position.holderName,
-        amountCents: position.amountCents,
-        effectiveDateISO: toISODate(position.effectiveDate),
-        allocatedTransactions: position.transactions.length,
-      })),
+      equityPositions: await Promise.all(
+        equityPositions.map(async (position) => ({
+          _id: position._id,
+          type: position.type,
+          holderName: position.holderName,
+          holderOrgSlug: position.holderOrgId
+            ? ((await ctx.db.get('organizations', position.holderOrgId))
+                ?.slug ?? null)
+            : null,
+          amountCents: position.amountCents,
+          // The ownership share lives HERE, on the issuer's cap table
+          // (SPEC D33) — null when the position carries no share.
+          ownershipBps: position.ownershipBps ?? null,
+          effectiveDateISO: toISODate(position.effectiveDate),
+          allocatedTransactions: position.transactions.length,
+        })),
+      ),
       loans: loans.map((loan) => ({
         _id: loan._id,
         counterpartyName: loan.counterpartyName,
