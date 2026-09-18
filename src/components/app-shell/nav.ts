@@ -11,16 +11,11 @@ import {
   Wallet,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import type { ModuleKey } from '../../../convex/lib/modules'
 
 export type NavLeaf = {
   /** i18n key under the `nav` namespace, e.g. `items.participations`. */
   titleKey: string
-  /**
-   * Activatable module this entry belongs to (SPEC D37). Absent = always
-   * shown: « À faire » aggregates the signals of every other module, and the
-   * workspace entries are not modules at all.
-   */
-  module?: 'investments' | 'cash' | 'passif'
   to: string
   /** Extra path prefixes that keep this item highlighted. */
   alsoActiveOn?: Array<string>
@@ -30,6 +25,13 @@ export type NavLeaf = {
   demo?: boolean
   /** When true, render as non-clickable with a `nav:comingSoon` badge. */
   soon?: boolean
+}
+
+/** Where each sub-section of Investissements lives. */
+export const SUBSECTION_ROUTES: Record<ModuleKey, string> = {
+  entreprises: '/app/$orgSlug/participations',
+  placements: '/app/$orgSlug/placements',
+  immobilier: '/app/$orgSlug/immobilier',
 }
 
 export type NavGroup = {
@@ -51,23 +53,25 @@ export function getNavGroups(): Array<NavGroup> {
         },
         {
           titleKey: 'items.investments',
-          module: 'investments',
-          to: '/app/$orgSlug/participations',
+          // Target rewritten to the org's first visible sub-section — an org
+          // that only holds buildings must not land on a page it hid
+          // (AppSidebar + SUBSECTION_ROUTES). All three are listed as active
+          // paths, so the entry stays highlighted whichever one it opens.
+          to: SUBSECTION_ROUTES.entreprises,
           alsoActiveOn: [
-            '/app/$orgSlug/placements',
-            '/app/$orgSlug/immobilier',
+            SUBSECTION_ROUTES.entreprises,
+            SUBSECTION_ROUTES.placements,
+            SUBSECTION_ROUTES.immobilier,
           ],
           icon: ChartCandlestick,
         },
         {
           titleKey: 'items.cash',
-          module: 'cash',
           to: '/app/$orgSlug/cash',
           icon: Wallet,
         },
         {
           titleKey: 'items.passif',
-          module: 'passif',
           to: '/app/$orgSlug/passif',
           icon: Scale,
         },

@@ -23,6 +23,66 @@ bas de page.
 
 ---
 
+## v1.244.0 — 18/09/2026 à 18:47 — La plateforme ne s'active plus, les sous-sections se décochent
+
+**Les quatre entrées de la barre latérale sont désormais toujours là** : À
+faire, Investissements, Trésorerie, Passif, que l'organisation s'en serve ou
+non. Le bouton « Activer un module » disparaît. Une organisation neuve
+s'ouvrait jusqu'ici sur deux entrées et un bouton dont rien ne disait ce
+qu'il contenait ; une entrée absente ne dit rien, alors qu'une page vide dit
+ce qu'elle attend.
+
+**Là où les organisations diffèrent vraiment, c'est à l'intérieur
+d'Investissements** — une SCI détient un immeuble et aucune participation,
+une holding l'inverse. Ses trois sous-sections se règlent donc une par une,
+et le **⋯ passe tout à droite** de la barre d'onglets, séparé de la liste où
+il se lisait comme un débordement.
+
+**Surtout, le réglage marche maintenant dans les deux sens.** Le menu listait
+seulement ce qui était masqué : une fois une sous-section ajoutée, elle
+quittait le menu et plus rien ne permettait de la retirer. Il liste désormais
+les trois avec leur état, et chaque ligne se coche **et se décoche** — on
+affiche Placements pour y créer son premier placement, on masque Immobilier
+si on n'en fera jamais. Au passage, l'onglet ouvert n'est plus proposé comme
+s'il était à ajouter.
+
+Deux lignes refusent d'être décochées, et disent pourquoi : une sous-section
+qui **contient des données** (la masquer emporterait ses lignes) et la
+**dernière affichée** (Investissements doit garder une page à ouvrir). Cette
+seconde règle est aussi ce qui fait qu'une organisation neuve arrive sur
+Entreprises sans avoir rien réglé.
+
+Enfin, l'entrée **Investissements** de la barre latérale ouvre la première
+sous-section affichée : une organisation qui ne fait que de l'immobilier
+atterrit sur Immobilier, et plus sur une page qu'elle avait masquée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/modules.ts` réduit à trois slugs (`entreprises`,
+>   `placements`, `immobilier`) : `SIDEBAR_MODULES` et `activatableModules`
+>   disparaissent, `visibleModules` ne prend plus d'ensemble en argument et
+>   porte le repli (`FALLBACK_MODULE`), nouveau `hideBlockedBy` qui rend
+>   `'content' | 'last' | null`. Le repli tient lieu de défaut : rien à
+>   écrire à la création d'une org, et les orgs vides existantes en
+>   bénéficient sans migration.
+> - `convex/modules.ts` perd les probes `investments` / `cash` / `passif` (et
+>   le helper `byOrg` devenu inutile) ; `setEnabled` refuse ces slugs comme
+>   n'importe quel inconnu, donc une ligne `enabledModules` héritée de
+>   l'ancienne version est inerte — `list` ne lit que `ALL_MODULES`.
+> - Front : `ModuleActivator.tsx` supprimé, remplacé par
+>   `src/components/investments/SubsectionsMenu.tsx`
+>   (`DropdownMenuCheckboxItem`, `onSelect` préventé pour garder le menu
+>   ouvert). `InvestmentsTabs` pousse le ⋯ en `ml-auto`. `AppSidebar` perd le
+>   filtrage par module et la prop `orgId` ; `nav.ts` perd le champ `module`
+>   et expose `SUBSECTION_ROUTES`, que la barre latérale utilise pour
+>   réécrire la cible d'« Investissements ».
+> - i18n : `nav:modules.*` remplacé (`subsections`, `shown`, `hidden`,
+>   `blocked.content`, `blocked.last`) ; les libellés des trois sous-sections
+>   viennent du titre de leur page, plus de doublon.
+> - Tests : `tests/modules.test.ts` et `convex/regression.modules.test.ts`
+>   réécrits sur les nouvelles règles (repli, les deux motifs de refus, la
+>   réversibilité, les slugs de plateforme refusés). `TESTING.md` : table MO
+>   refaite (MO1–MO10).
 ## v1.243.2 — 18/09/2026 à 18:55 — Ménage : quatre tables inertes ont quitté la base
 
 Les quatre dernières tables héritées de fonctionnalités retirées (connexion
