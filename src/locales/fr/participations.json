@@ -356,6 +356,7 @@
     "actor": {
       "attio": "Attio",
       "vasco": "Parallel",
+      "intelligence": "Synthèse IA",
       "unknown": "Albo OS"
     },
     "field": {
@@ -405,6 +406,11 @@
       "vasco_unlinked": "a délié la fiche de son émetteur Parallel",
       "kpi_added": "a ajouté le KPI {{metric}} au {{date}} · {{value}}",
       "kpi_removed": "a supprimé le KPI {{metric}} au {{date}}",
+      "score_updated_first": "a noté la santé à {{to}}/10 (première note)",
+      "score_updated_up": "a relevé la note de santé de {{from}} à {{to}}/10",
+      "score_updated_down": "a abaissé la note de santé de {{from}} à {{to}}/10",
+      "score_updated_same": "a maintenu la note de santé à {{to}}/10",
+      "score_updated_after": ", après le reporting « {{label}} »",
       "projection_replaced_one": "a remplacé le BP {{version}} de {{deal}} ({{count}} ligne)",
       "projection_replaced_other": "a remplacé le BP {{version}} de {{deal}} ({{count}} lignes)",
       "rule_created": "a ajouté la règle « {{label}} » ({{amount}} {{frequency}}) sur {{deal}}",
@@ -646,7 +652,13 @@
     "synthesis": {
       "header": "Synthèse IA · dernier report reçu",
       "generatedAt": "Généré le {{date}}",
-      "scoreValue": "Score {{score}}/10"
+      "scoreValue": "Score {{score}}/10",
+      "evolution": {
+        "first": "Première note",
+        "up": "↑ Avant : {{score}}/10",
+        "down": "↓ Avant : {{score}}/10",
+        "same": "→ Inchangée"
+      }
     },
     "verdict": {
       "good": "En bonne voie",

@@ -37,6 +37,7 @@ import {
   reviewReasonLabel,
 } from './emailTemplates'
 import { companyLogoUrl } from './lib/domain'
+import { latestScoreEvolution } from './lib/scoreEvolution'
 import { wantsAlert } from './lib/notificationPrefs'
 import { reportIssueRecipients } from './lib/reportRecipients'
 import { isBlockedSender, resolveMemberByEmail } from './lib/reportSenders'
@@ -250,6 +251,8 @@ export const entityCards = internalQuery({
           ? {
               score: ai.health_score?.score,
               scoreLabel: ai.health_score?.label,
+              evolution:
+                (await latestScoreEvolution(ctx, ref.companyId)) ?? undefined,
               summary: ai.executive_summary,
               goodPoints: ai.health_score?.good_points ?? [],
               badPoints: ai.health_score?.bad_points ?? [],

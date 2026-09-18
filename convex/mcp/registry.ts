@@ -475,7 +475,8 @@ export const mcpTools: Array<McpTool> = [
       'The AI synthesis of a portfolio company, computed from its reports: ' +
       'executive summary, health score (1-10 with good/bad points), top ' +
       'insights and alerts. Returns null when no synthesis exists yet. ' +
-      'latestReportId points at the report it was last refreshed from.',
+      'latestReportId points at the report it was last refreshed from; ' +
+      'scoreEvolution gives the previous score (null on a first score).',
     schema: { org: orgSlug, companyId: z.string() },
     run: async (ctx, actorUserId, { org, companyId }) =>
       await ctx.runQuery(internal.intelligence.getByCompanyInternal, {

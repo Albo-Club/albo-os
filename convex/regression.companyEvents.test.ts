@@ -867,6 +867,76 @@ describe('companyEvents: the company itself, KPIs and the business plan', () => 
     ).toEqual([false, true, false])
   })
 
+  test('the AI score is journaled at every synthesis, changed or not (ALB-252)', async () => {
+    const { t, user, org, target } = await orgSetup('org-score')
+    const synth = (score: number, label: string) =>
+      t.mutation(internal.intelligence.upsertIntelligence, {
+        companyId: target,
+        orgId: org.orgId,
+        status: 'completed',
+        analysis: { executive_summary: 's', health_score: { score, label } },
+      })
+    const report = (reportPeriod: string) =>
+      t.run(async (ctx) =>
+        ctx.db.insert('companyReports', {
+          orgId: org.orgId,
+          companyId: target,
+          source: 'upload',
+          status: 'completed',
+          reportPeriod,
+        }),
+      )
+    // A synthesis that yields no score (processing, no_data) writes nothing.
+    await t.mutation(internal.intelligence.upsertIntelligence, {
+      companyId: target,
+      orgId: org.orgId,
+      status: 'no_data',
+      analysis: null,
+    })
+    await report('Q3 2025')
+    await synth(8, 'En bonne voie')
+    await report('Q4 2025')
+    await synth(6, 'À surveiller')
+    await synth(6, 'À surveiller') // manual rerun, same score: still a line
+    const rows = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: target,
+      })
+    ).filter((r) => r.deal === null)
+    expect(rows.map((r) => r.event)).toEqual([
+      {
+        kind: 'score_updated',
+        from: 6,
+        to: 6,
+        label: 'À surveiller',
+        reportLabel: 'Q4 2025',
+      },
+      {
+        kind: 'score_updated',
+        from: 8,
+        to: 6,
+        label: 'À surveiller',
+        reportLabel: 'Q4 2025',
+      },
+      {
+        kind: 'score_updated',
+        to: 8,
+        label: 'En bonne voie',
+        reportLabel: 'Q3 2025',
+      },
+    ])
+    expect(rows[0].actor).toEqual({ kind: 'system', source: 'intelligence' })
+    // The fiche reads the latest line back as before → after, with the
+    // report the previous score came from.
+    const intel = await user.as.query(api.intelligence.getByCompany, {
+      companyId: target,
+    })
+    expect(intel?.scoreEvolution).toEqual({
+      previousScore: 6,
+      previousReportLabel: 'Q4 2025',
+    })
+  })
+
   test('a business plan replaced is one event on the deal', async () => {
     const { user, target, dealId } = await orgSetup('org-bp')
     await user.as.mutation(api.projections.replaceVersion, {
