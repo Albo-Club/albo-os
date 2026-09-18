@@ -62,6 +62,50 @@ ne restait que trois points gris. Désormais :
 >   `sources.*`, `tool.items` ; `tests/toolLabels.test.ts`
 >   compare les clés aux exports `*Tools` de `convex/agentTools*.ts` (un
 >   outil sans libellé fait rougir la CI).
+## v1.239.3 — 18/09/2026 à 14:55 — La rotation des sauvegardes fait vraiment le ménage
+
+La sauvegarde quotidienne annonçait depuis dix jours qu'elle purgeait les
+archives trop anciennes du Drive, sans que rien ne parte : le dossier
+grossissait d'une archive par jour. Les archives hors rotation sont
+désormais mises à la corbeille du Drive partagé (vidée automatiquement au
+bout de 30 jours), et le run vérifie que l'action a bien eu lieu au lieu de
+le supposer. Rien de visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/convex-backup.mjs` : `deleteArchive` (`DELETE`, réservé au rôle
+>   Gestionnaire sur un Drive partagé — le compte de service est Gestionnaire
+>   de contenu) remplacé par `trashArchive` (`PATCH { trashed: true }` avec
+>   `fields=trashed`, réponse contrôlée, 404 loggé « introuvable, ignorée » et
+>   non compté). Le résumé de fin de run compte les mises à la corbeille
+>   réelles.
+> - `KNOWN_ISSUES.md` : nouvelle section « Un Gestionnaire de contenu ne
+>   supprime pas sur un Drive partagé » ; `MIGRATIONS.md` (étape 3 du runbook :
+>   ne pas monter le compte en Gestionnaire, vérifier la corbeille) ;
+>   `TESTING.md` B12.
+
+## v1.239.2 — 18/09/2026 à 14:50 — Ménage : vider l'ancienne timeline d'e-mails
+
+Outil interne, rien de visible dans l'app. Une ancienne fonctionnalité de
+timeline d'e-mails, retirée depuis longtemps, gardait encore ses messages et
+leurs pièces jointes dans la base. Une opération à lancer une fois les vide ;
+les pièces jointes devenues orphelines partent ensuite avec l'outil de purge
+existant, et les deux tables quitteront la structure de la base dans la
+foulée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/purgeCompanyEmails.ts` : `scanPage` (comptage paginé,
+>   borné à 4 Mio par `maximumBytesRead` — une ligne porte son corps) et
+>   `purgeBatch` (supprime la première page d'une table, `isDone` dit s'il en
+>   reste). Tables `companyEmails` et `companyEmailLinks` seulement.
+> - `scripts/purge-company-emails.mjs` : à blanc par défaut (lignes par
+>   table), `--apply` vide la jointure puis les messages. Fonctions feuilles,
+>   pas d'auto-référence `internal.*`.
+> - `convex/regression.purgeCompanyEmails.test.ts` (2 cas via `anyApi`).
+> - Runbook dans `MIGRATIONS.md` : snapshot **complet** avant (des fichiers
+>   seront effacés par `storage-purge` derrière), puis PR de suivi qui retire
+>   les tables du schéma et des outils d'audit.
 
 ## v1.239.1 — 18/09/2026 à 13:50 — Ménage : l'ancienne copie du texte des documents a disparu
 

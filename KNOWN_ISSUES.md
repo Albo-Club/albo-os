@@ -5990,6 +5990,41 @@ backup, réplication, audit), regarder ce qu'il **lit** et non ce qu'il écrit
 
 ---
 
+## Un Gestionnaire de contenu ne supprime pas sur un Drive partagé — et le run reste vert
+
+Sur un Drive partagé, l'appel `files.delete` de l'API Drive (suppression
+définitive, sans passage par la corbeille) est réservé au rôle
+**Gestionnaire** (`organizer`). Le compte de service du backup est
+**Gestionnaire de contenu** (`fileOrganizer`), le rôle minimal pour écrire
+dans le dossier — et le bon : Gestionnaire donne aussi le droit de gérer les
+membres et de supprimer le Drive entier.
+
+Le cas vécu (9 → 18 septembre 2026) : `scripts/convex-backup.mjs` purgeait
+avec `DELETE`, et traitait un 404 comme « déjà partie » sans rien dire. Avec
+ce rôle, Drive ne répond ni par une erreur qui arrête le script ni par une
+suppression : dix runs verts de suite ont écrit `purgée : …` sur les mêmes
+archives, et le dossier n'a jamais maigri. Deux runs le même jour ont
+« purgé » exactement les quatre mêmes fichiers — c'est ce doublon dans les
+logs qui a révélé le no-op, pas une erreur.
+
+Ce que fait le script depuis :
+
+- il **met à la corbeille** (`PATCH { trashed: true }`), geste permis à un
+  Gestionnaire de contenu. Google vide la corbeille d'un Drive partagé après
+  30 jours, donc l'archive disparaît quand même — avec un mois pour rattraper
+  une rotation fausse. Le listing du script filtre déjà `trashed = false`,
+  donc une archive corbeillée sort de la rotation dès le run suivant ;
+- il **vérifie la réponse** : `fields=trashed` fait renvoyer l'état résultant,
+  et un 2xx qui ne dit pas `trashed: true` est une erreur, pas un succès ;
+- un 404 est loggé « introuvable, ignorée » et n'entre pas dans le compte des
+  archives purgées.
+
+Le réflexe général : quand une API peut répondre « OK » sans avoir agi
+(permission manquante côté ressource, no-op silencieux), demander l'état
+résultant dans la réponse et le comparer — un code HTTP ne prouve rien. Et
+un message de succès qui se répète à l'identique d'un run à l'autre est le
+signe d'une action sans effet.
+
 ## Le composant RAG garde chaque version remplacée
 
 `@convex-dev/rag` ne supprime **jamais** une entrée de lui-même. Ré-ajouter

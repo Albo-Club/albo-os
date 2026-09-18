@@ -69,6 +69,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Véhicule en tête de nom de fiche (org `calte`) | `convex/migrations/renameSideVehicles.ts` → `dryRun` / `apply` / `report` | Déplace le véhicule en **fin** de nom, entre parenthèses : `SIDE  TIMELEFT` → `TIMELEFT (SIDE)`. 48 fiches (SIDE, ASTERION, plus `SPACELY STOCKAGE (STOCKOSS)`). Le rattachement d'un report cherche le nom de la fiche **en entier** dans le mail et ignore la parenthèse finale (`convex/lib/emailIdentify.ts`) : tant que le véhicule était devant, aucun fondateur n'écrivant « SIDE TIMELEFT », ces participations ne pouvaient se rattacher que par le domaine de l'expéditeur — donc jamais sur un transfert par un tiers. **Ne touche pas** les 8 fiches où le fonds EST la participation (`SIDE 1/2/3`, `SIDE INVEST`, `SIDE Invest 2/3` sur `side-capital.com`, `ASTERION F1/F2`) : là, « SIDE » est le nom, pas un préfixe. Ancrage par `_id` prod + garde sur le nom stocké (comparé espaces normalisés — 8 de ces fiches portent un espace double ou final). Idempotent : une fiche déjà renommée est comptée `alreadyRenamed`, une fiche renommée à la main entre-temps est signalée `anchorMismatch` et **pas** réécrite. **Ordre** : `pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip` (vérifier que le `.zip` existe) → `dryRun` (lire la liste from → to) → `apply` → `report`. |
 | Purge des entrées RAG remplacées (**destructif**, sans perte) | `convex/vectorize.ts` → `cleanupReplacedEntries` (+ cron horaire du même nom) | Efface les entrées du composant RAG marquées `replaced` depuis plus d'une heure — chunks et embeddings des versions qu'une ré-indexation a remplacées, qu'aucune recherche ne lit et que le composant ne supprime jamais seul (cf. `KNOWN_ISSUES.md` « Le composant RAG garde chaque version remplacée »). ~5 Go en prod au 17/09/2026, lus en entier par chaque `convex export` de l'ancien backup. **Pas de snapshot préalable** : rien d'unique n'est détruit, une entrée `replaced` se recalcule depuis son document (`vectorize:backfillAll`). Un seul appel suffit — la mutation traite **une entrée par transaction** (`rag.deleteAsync` efface déjà jusqu'à 8 Mo de chunks dans l'appelant, cf. `KNOWN_ISSUES.md`) et se replanifie jusqu'à épuisement : `pnpm exec convex run --prod vectorize:cleanupReplacedEntries '{}'`. La commande rend la main tout de suite (`{ deleted: 1, done: false }`) ; la purge continue en arrière-plan, à suivre dans Logs (une exécution par entrée). Idempotente ; le cron la relance chaque heure. Vérifier : Data → composant `rag` → `entries`, plus aucune ligne `replaced` ancienne, et Database Storage en baisse nette sur le dashboard Usage. |
 | Champ legacy `documents.extractedText` (vidage — **fait le 18/09/2026**) | `convex/migrations/legacyExtractedText.ts` + `scripts/legacy-extracted-text.mjs` (retirés avec le champ, PR de suivi) | A vidé le champ mort `extractedText` des lignes `documents` qui le portaient encore — texte mis là avant `documentTexts`, lu par rien, mais payé à chaque lecture de la ligne. Résultat en prod : 1 714 documents balayés, **11** portaient le champ (214 Ko), 11 textes recopiés dans `documentTexts` (aucun n'y était), `ocrState: 'extracted'` + `ocrChars` posés, `vectorState` remis à zéro puis `vectorize:backfillAll` relancé. Le champ a quitté le schéma dans la PR suivante, avec le module, le script et leur test. Si un ancien export réintroduisait des lignes portant le champ, le déploiement échouerait sur la validation de schéma : rejouer la même logique (recopier le texte vers `documentTexts` s'il n'y est pas, effacer le champ) avant de resserrer. |
+| Purge de l'ancienne timeline d'e-mails (**destructif**) | `convex/migrations/purgeCompanyEmails.ts` (`scanPage` / `purgeBatch`) + `node scripts/purge-company-emails.mjs` | Vide les deux tables de la timeline e-mail retirée, `companyEmails` (messages complets, corps inclus) et `companyEmailLinks` (jointure message ↔ société) — déclarées mais inertes, écrites par rien, lues par rien sinon l'audit du stockage qui les balaie comme porteuses de fichiers. Au 18/09/2026 elles retenaient encore 29 pièces jointes (10,4 Mo, 1 % du stockage). **Ordre** : Actions → « Convex backup » → Run workflow avec **« Forcer une archive complète »** cochée (on va effacer des fichiers, cf. `CLAUDE.md` sur le snapshot qui doit couvrir ce qu'on détruit) → `node scripts/purge-company-emails.mjs` (à blanc : nombre de lignes par table) → `--apply` (jointure d'abord, puis messages, par pages bornées en octets) → relancer à blanc, zéro → `node scripts/storage-purge.mjs` puis `--apply` : les pièces jointes n'ont plus de porteur, l'outil existant les traite comme les orphelins qu'elles sont devenues. Idempotent. Quand les deux tables sont vides : PR de suivi qui les retire du schéma **et** des deux outils d'audit (`storageAudit.scanHolders`, `scripts/lib/storage-holders.mjs`), le module et le script partant avec elles. |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations (la fusion Palatine ci-dessus est
@@ -188,10 +189,18 @@ Le chemin du provider à reporter dans GitHub :
 
 Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) → y créer
 un dossier `snapshots` → **Gérer les membres** → ajouter l'e-mail du compte de
-service en **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer,
-sinon la purge échoue). Google avertit que l'adresse est hors de
-l'organisation : normal pour un compte de service. Relever l'ID du dossier
-dans son URL.
+service en **Gestionnaire de contenu** (il doit pouvoir écrire *et* mettre à
+la corbeille — c'est ce que fait la purge, pas une suppression définitive).
+Google avertit que l'adresse est hors de l'organisation : normal pour un
+compte de service. Relever l'ID du dossier dans son URL.
+
+⚠️ Ne pas monter le compte en **Gestionnaire** pour « permettre la
+suppression » : la purge n'en a pas besoin. Une archive purgée part dans la
+corbeille du Drive partagé, que Google vide seule au bout de 30 jours ; la
+suppression définitive, elle, est réservée au rôle Gestionnaire, qui donne
+aussi le droit de gérer les membres et de supprimer le Drive entier — cf.
+`KNOWN_ISSUES.md` « Un Gestionnaire de contenu ne supprime pas sur un Drive
+partagé ».
 
 ⚠️ Un compte de service **n'a aucun quota de stockage propre**. Pointé
 ailleurs que sur un Drive partagé dont il est membre, l'upload échoue. C'est
@@ -254,7 +263,10 @@ node scripts/convex-backup.mjs --dry   # dit ce qui partirait et ce qui serait p
 
 Puis, pour de vrai : Actions → « Convex backup » → Run workflow, en cochant
 **« Forcer une archive complète »** au premier essai — ça valide d'un coup
-l'export, les fichiers, l'auth WIF, l'upload et la purge.
+l'export, les fichiers, l'auth WIF, l'upload et la purge. Pour la purge, ne
+pas se fier au seul log : chaque archive annoncée « mise à la corbeille »
+doit avoir quitté le dossier et apparaître dans la **corbeille du Drive
+partagé**.
 
 Un échec ouvre une issue labellisée `convex-backup`. Deux exceptions
 volontaires, qui sont des états de setup et non des incidents : une
