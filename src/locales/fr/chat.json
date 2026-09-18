@@ -31,9 +31,22 @@
     "denied": "Action refusée"
   },
   "tool": {
+    "statePending": "En attente",
+    "stateRunning": "En cours",
+    "stateApprovalRequested": "Confirmation requise",
+    "stateApprovalResponded": "Réponse envoyée",
+    "stateCompleted": "Terminé",
+    "stateError": "Erreur",
+    "stateDenied": "Refusé",
     "parameters": "Paramètres",
     "result": "Résultat",
     "error": "Erreur",
+    "items_one": "{{count}} élément",
+    "items_other": "{{count}} éléments",
+    "calls_one": "{{count}} appel",
+    "calls_other": "{{count}} appels",
+    "call": "Appel {{n}}",
+    "details": "Détails",
     "labels": {
       "addLoanAmendment": "Ajout d'un avenant",
       "addLoanRate": "Ajout d'un palier de taux",
@@ -102,9 +115,7 @@
       "updateForecastRule": "Modification d'une règle de prévisionnel",
       "updateIntercompanyLoan": "Modification d'un compte courant",
       "webSearch": "Recherche web"
-    },
-    "items_one": "{{count}} élément",
-    "items_other": "{{count}} éléments"
+    }
   },
   "threads": {
     "history": "Historique",
