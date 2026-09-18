@@ -22,12 +22,12 @@
  *   blob seconds old with no holder is not an orphan, it is someone's file
  *   mid-flight.
  *
- * The other four holder tables (`inboundEmails`, `companyEmails`, `users`,
- * `organizations`) are not re-checked, and that is a reasoned exception to
- * the rule in KNOWN_ISSUES.md rather than an oversight: each only ever points
- * at a blob it has just created, so none of them can come to claim a blob
- * that was already old and unheld when the sweep saw it. Re-checking them
- * would mean a full scan of two heavy tables PER blob.
+ * The other three holder tables (`inboundEmails`, `users`, `organizations`)
+ * are not re-checked, and that is a reasoned exception to the rule in
+ * KNOWN_ISSUES.md rather than an oversight: each only ever points at a blob
+ * it has just created, so none of them can come to claim a blob that was
+ * already old and unheld when the sweep saw it. Re-checking them would mean
+ * a full scan of a heavy table PER blob.
  */
 import { v } from 'convex/values'
 import { internalMutation } from '../_generated/server'

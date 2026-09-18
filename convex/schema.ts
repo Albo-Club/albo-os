@@ -1685,61 +1685,6 @@ export default defineSchema({
     .index('by_message_id', ['agentmailMessageId'])
     .index('by_status', ['status']),
 
-  /**
-   * companyEmails — LEGACY, declared but inert (retired emails feature).
-   * Was the portfolio email timeline: one row per message, deduplicated
-   * across mailboxes by the RFC `Message-ID` header, stored in full with
-   * attachments in Convex storage. Kept declared with its data until the
-   * purge-then-narrow cleanup (same convention as the legacy `forecasts`
-   * table). Read by nothing.
-   */
-  companyEmails: defineTable({
-    headerMessageId: v.string(), // RFC Message-ID — dedup key
-    gmailMessageId: v.optional(v.string()), // Gmail id of the first sighting
-    gmailThreadId: v.optional(v.string()), // thread of the first sighting
-    subject: v.string(),
-    snippet: v.optional(v.string()),
-    bodyText: v.optional(v.string()),
-    fromEmail: v.string(),
-    fromName: v.optional(v.string()),
-    toEmails: v.array(v.string()),
-    ccEmails: v.array(v.string()),
-    sentAt: v.number(), // ms epoch (Gmail internalDate)
-    direction: v.union(v.literal('incoming'), v.literal('outgoing')),
-    accountEmails: v.array(v.string()), // connected mailboxes that saw it
-    // Downloaded attachments (matched messages only, ≤ 20 MB each, inline
-    // signature images skipped). Bounded: a mail carries a handful of files.
-    attachments: v.optional(
-      v.array(
-        v.object({
-          filename: v.string(),
-          contentType: v.optional(v.string()),
-          size: v.optional(v.number()),
-          storageId: v.id('_storage'),
-        }),
-      ),
-    ),
-  }).index('by_header_message_id', ['headerMessageId']),
-
-  /**
-   * companyEmailLinks — LEGACY, declared but inert (retired emails feature,
-   * same convention as `companyEmails`). Join table email ↔ matched company.
-   * Read by nothing.
-   */
-  companyEmailLinks: defineTable({
-    companyId: v.id('companies'),
-    orgId: v.id('organizations'),
-    emailId: v.id('companyEmails'),
-    sentAt: v.number(),
-    // How the link was found: 'participant_domain' | 'body_domain' |
-    // 'name_mention' | 'llm_direct' | 'llm_indirect'. Absent on links
-    // created before the matching cascade shipped.
-    matchMethod: v.optional(v.string()),
-  })
-    .index('by_company_and_sentAt', ['companyId', 'sentAt'])
-    .index('by_org_and_sentAt', ['orgId', 'sentAt'])
-    .index('by_email', ['emailId']),
-
   // ─── Bank debt (loans + dated rate series) ────────────────────────────────
 
   /**

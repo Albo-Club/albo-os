@@ -109,12 +109,8 @@ export const describe = internalQuery({
 
 /**
  * One page of a table that can hold a storage reference, reduced to the
- * references it holds. Six places in the schema point at a blob, and a blob
+ * references it holds. Five places in the schema point at a blob, and a blob
  * is only deletable when NONE of them does.
- *
- * `companyEmails` is the retired email timeline: declared, still carrying its
- * attachments, read by nothing. It is swept like the others precisely so its
- * weight can be told apart from the live holders rather than assumed.
  */
 export const scanHolders = internalQuery({
   args: {
@@ -122,7 +118,6 @@ export const scanHolders = internalQuery({
       v.literal('documents'),
       v.literal('documentTexts'),
       v.literal('inboundEmails'),
-      v.literal('companyEmails'),
       v.literal('users'),
       v.literal('organizations'),
     ),
@@ -151,13 +146,6 @@ export const scanHolders = internalQuery({
           res.page.flatMap((r) =>
             r.attachments.flatMap((a) => (a.storageId ? [a.storageId] : [])),
           ),
-        )
-      }
-      case 'companyEmails': {
-        const res = await ctx.db.query('companyEmails').paginate(opts)
-        return page(
-          res,
-          res.page.flatMap((r) => (r.attachments ?? []).map((a) => a.storageId)),
         )
       }
       case 'users': {
