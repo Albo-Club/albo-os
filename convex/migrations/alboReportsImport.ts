@@ -311,7 +311,8 @@ export const importOne = internalMutation({
           : {}),
       })
       // Carry the text Albo app already extracted rather than paying Mistral
-      // to read the file again (cf. MIGRATIONS.md, `documents.extractedText`).
+      // to read the file again (cf. KNOWN_ISSUES.md « Texte extrait d'un
+      // document »).
       if (f.text) {
         const existing = await ctx.db
           .query('documentTexts')
