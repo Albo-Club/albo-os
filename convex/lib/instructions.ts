@@ -198,7 +198,7 @@ export const BASE_INSTRUCTIONS = [
  * would send the model hunting.
  */
 const ENTITY_TOOLS: Record<'deal' | 'company' | 'loan' | 'property', string> = {
-  deal: 'listDeals then filter by this id, listValuations, listTransactions',
+  deal: 'getDeal, listValuations, listTransactions',
   company:
     'getCompany, listCompanyReports, getCompanyIntelligence, listCompanyDocuments',
   loan: 'listLoans then filter by this id, getLoanSchedule, listGuarantees',

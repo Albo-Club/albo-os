@@ -22,6 +22,7 @@ import {
   transactionTotals,
 } from './deals'
 import { parseScope, readMembership } from './lib/agentScope'
+import { ownershipForCompany } from './liabilities'
 import {
   diffCompanyPatch,
   diffDealPatch,
@@ -134,6 +135,7 @@ export const listDealsInternal = internalQuery({
         const realized = await dealRealizedMetrics(ctx, d)
         return {
           _id: d._id,
+          name: d.name ?? null,
           investor: companyName(
             await ctx.db.get('companies', d.investorCompanyId),
           ),
@@ -144,6 +146,9 @@ export const listDealsInternal = internalQuery({
           instrumentKind: d.instrumentKind,
           committedAmount: d.committedAmount ?? null,
           paidAmount: d.paidAmount ?? null,
+          // The stake recorded ON the deal (bps). A group subsidiary carries
+          // its stake on its own cap table instead — getDealInternal reads it.
+          ownershipPct: d.ownershipPct ?? null,
           status: d.status,
           signedDate: d.signedDate ?? null,
           // Transaction-true realized figures (cents; MOIC/IRR are decimals,
@@ -155,6 +160,72 @@ export const listDealsInternal = internalQuery({
         }
       }),
     )
+  },
+})
+
+/**
+ * The whole deal row — every instrument column, whatever the kind — plus the
+ * resolved names, the transaction-true figures and the ownership share. The
+ * share follows the company sheet (SPEC D33): a group subsidiary's own cap
+ * table answers first, then the stake recorded on the deal, then the ratio
+ * of this deal's shares to the company's share count. `source` says which.
+ */
+export const getDealInternal = internalQuery({
+  args: {
+    orgId: v.id('organizations'),
+    actorUserId: v.id('users'),
+    dealId: v.id('deals'),
+  },
+  handler: async (ctx, { orgId, actorUserId, dealId }) => {
+    await readMembership(ctx, orgId, actorUserId)
+    const d = await ctx.db.get('deals', dealId)
+    if (!d || d.orgId !== orgId) throw new ConvexError('not_found')
+
+    // Technical columns only: import anchors, the hand-edit marker, and the
+    // royalty BP/actuals series (a dedicated panel, not deal terms).
+    const {
+      orgId: _orgId,
+      airtableId: _airtableId,
+      manuallyEditedFields: _manuallyEditedFields,
+      bpPoints: _bpPoints,
+      actualPoints: _actualPoints,
+      ...fields
+    } = d
+
+    const target = await ctx.db.get('companies', d.targetCompanyId)
+    const capTable = target
+      ? await ownershipForCompany(ctx, orgId, target)
+      : null
+    const ownership = capTable
+      ? {
+          bps: capTable.ownershipBps,
+          source: 'cap_table' as const,
+          issuingOrgSlug: capTable.issuingOrgSlug,
+          effectiveDate: capTable.effectiveDate,
+        }
+      : d.ownershipPct != null
+        ? { bps: d.ownershipPct, source: 'deal' as const }
+        : target?.totalShares && d.sharesAcquired
+          ? {
+              bps: Math.round((d.sharesAcquired / target.totalShares) * 10000),
+              source: 'share_ratio' as const,
+            }
+          : null
+
+    const realized = await dealRealizedMetrics(ctx, d)
+    return {
+      ...fields,
+      investor: companyName(await ctx.db.get('companies', d.investorCompanyId)),
+      target: companyName(target),
+      viaSpv: d.viaSpvCompanyId
+        ? companyName(await ctx.db.get('companies', d.viaSpvCompanyId))
+        : null,
+      ownership,
+      paidActual: realized.paidActual,
+      received: realized.received,
+      moic: realized.moic,
+      irr: realized.irr,
+    }
   },
 })
 
@@ -563,6 +634,29 @@ const listDeals = createTool({
     return await ctx.runQuery(internal.agentTools.listDealsInternal, {
       orgId,
       actorUserId: userId,
+    })
+  },
+})
+
+const getDeal = createTool({
+  description:
+    'Full sheet of one deal: every instrument field (shares, price per ' +
+    'share, round and valuations, interest rate, maturity, principal, cap ' +
+    'and discount, SPV stake, fund terms…), names of investor/target/SPV, ' +
+    'realized figures, and `ownership` — the stake the org holds through ' +
+    'this deal, in bps, with its source: the subsidiary cap table ' +
+    '("cap_table"), the stake recorded on the deal ("deal"), or the ratio ' +
+    'of shares acquired to the company share count ("share_ratio"). Use ' +
+    'listDeals first if you do not know the deal id.',
+  inputSchema: z.object({
+    dealId: z.string(),
+  }),
+  execute: async (ctx, input): Promise<unknown> => {
+    const { orgId, userId } = parseScope(ctx.userId)
+    return await ctx.runQuery(internal.agentTools.getDealInternal, {
+      orgId,
+      actorUserId: userId,
+      dealId: input.dealId as Id<'deals'>,
     })
   },
 })
@@ -1144,6 +1238,7 @@ export const dealTools = {
   listCompanies,
   getCompany,
   listDeals,
+  getDeal,
   createCompany,
   createDeal,
   updateDeal,

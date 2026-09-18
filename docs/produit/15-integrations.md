@@ -135,9 +135,17 @@ actifs »).
 
 - **~30 outils de consultation** (deals, fiches sociétés, reportings des
   participations et synthèse IA, comptes, transactions, prévisionnel, passif,
-  valorisations, KPIs, TVA…). Côté dette, l'**échéancier** d'un prêt se lit
-  échéance par échéance (plan et réalisé côte à côte), et un placement nanti
-  rend ce qu'il garantit et la **marge disponible** qu'il lui reste.
+  valorisations, KPIs, TVA…). La **fiche complète d'un deal** se lit d'un
+  coup : tous les termes de l'instrument (actions et prix par action, tour et
+  valorisations, taux et échéance, cap et décote, part dans un SPV…) et le
+  **pourcentage de détention** que l'organisation tient à travers ce deal,
+  avec sa provenance — la table de capitalisation de la filiale quand c'en
+  est une (le même chiffre que l'en-tête de la fiche société), sinon la part
+  saisie sur le deal, sinon le ratio actions acquises / capital. Le passif
+  rend, de son côté, la part de chaque détenteur au capital. Côté dette,
+  l'**échéancier** d'un prêt se lit échéance par échéance (plan et réalisé
+  côte à côte), et un placement nanti rend ce qu'il garantit et la **marge
+  disponible** qu'il lui reste.
 - **La documentation des participations est interrogeable** : pactes
   d'actionnaires, statuts, bulletins de souscription, PV d'assemblée, term
   sheets, comptes annuels, business plans. Une recherche par le sens («

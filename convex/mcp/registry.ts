@@ -293,13 +293,37 @@ export const mcpTools: Array<McpTool> = [
   defineTool({
     name: 'listDeals',
     description:
-      'List investments (deals) in an org with investor, target, instrument ' +
-      'and status. Amounts in CENTS EUR, rates in BASIS POINTS.',
+      'List investments (deals) in an org with investor, target, instrument, ' +
+      'status, realized figures and ownershipPct (the stake recorded on the ' +
+      'deal). Amounts in CENTS EUR, rates in BASIS POINTS. Use getDeal for ' +
+      'the full sheet of one deal — it is also where the stake in a group ' +
+      'subsidiary is read from the subsidiary cap table.',
     schema: { org: orgSlug },
     run: async (ctx, actorUserId, { org }) =>
       await ctx.runQuery(internal.agentTools.listDealsInternal, {
         orgId: await orgIdFor(ctx, actorUserId, org),
         actorUserId,
+      }),
+  }),
+  defineTool({
+    name: 'getDeal',
+    description:
+      'Full sheet of one deal: every instrument field (shares, price per ' +
+      'share, round type and pre/post-money, interest rate, maturity, ' +
+      'principal, valuation cap and discount, SPV stake, fund terms, ' +
+      'warrants, real-estate and placement fields…), names of investor / ' +
+      'target / SPV, realized figures, and `ownership`: the stake the org ' +
+      'holds through this deal in BASIS POINTS, with its source — the ' +
+      'subsidiary cap table ("cap_table"), the stake recorded on the deal ' +
+      '("deal"), or the ratio of shares acquired to the company share ' +
+      'count ("share_ratio"). Use listDeals first if you do not know the ' +
+      'deal id. Amounts in CENTS EUR, dates in ms epoch.',
+    schema: { org: orgSlug, dealId: z.string() },
+    run: async (ctx, actorUserId, { org, dealId }) =>
+      await ctx.runQuery(internal.agentTools.getDealInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        dealId: dealId as Id<'deals'>,
       }),
   }),
   defineTool({
@@ -530,7 +554,8 @@ export const mcpTools: Array<McpTool> = [
   defineTool({
     name: 'listLiabilities',
     description:
-      'Liabilities of an org: equity positions (capital, who holds what) and ' +
+      'Liabilities of an org: equity positions (capital, who holds what and ' +
+      'their ownershipBps share — the cap table of the org) and ' +
       'intercompany loans with balances derived from transactions. Amounts ' +
       'in CENTS EUR, rates in BASIS POINTS.',
     schema: { org: orgSlug },

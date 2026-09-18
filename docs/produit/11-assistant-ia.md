@@ -32,8 +32,10 @@ Une soixantaine d'outils, par domaine :
 
 - **Portfolio** : lister sociétés et deals (avec performance), consulter la
   fiche complète d'une société (secteur, pitch, identité légale, personnes,
-  KPI suivis), créer une participation, créer/mettre à jour un deal, éditer
-  une société, consulter le résumé du véhicule, lister les documents.
+  KPI suivis) ou d'un deal (tous les termes de l'instrument et le pourcentage
+  de détention, lu comme sur la fiche société), créer une participation,
+  créer/mettre à jour un deal, éditer une société, consulter le résumé du
+  véhicule, lister les documents.
 - **Reportings** : lire les comptes rendus reçus des participations
   (points clés, métriques extraites) et la synthèse IA d'une société — score
   de santé, insights, alertes, et lister les **boîtes silencieuses** (celles
