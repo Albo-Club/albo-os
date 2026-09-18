@@ -23,8 +23,7 @@ bas de page.
 
 ---
 
-<<<<<<< HEAD
-## v1.242.1 — 18/09/2026 à 18:35 — Ménage : vider quatre tables inertes
+## v1.243.1 — 18/09/2026 à 18:40 — Ménage : vider quatre tables inertes
 
 Outil de purge des quatre dernières tables héritées de fonctionnalités
 retirées (connexion Gmail, adresses d'envoi secondaires, anciennes
@@ -41,7 +40,6 @@ connexions Vasco), avant de les retirer de la base. Rien ne change à l'écran.
 >   appliqué tout part, rejeu à zéro.
 > - `MIGRATIONS.md` : la ligne de l'opération (ordre, pas de snapshot
 >   spécifique, PR de suivi qui resserre le schéma).
-=======
 ## v1.243.0 — 18/09/2026 à 18:27 — L'onglet À faire réclame un relevé de titres quand il vieillit
 
 Quand une banque n'est pas couverte par la connexion bancaire — le cas de
@@ -79,7 +77,6 @@ Le bloc se vide tout seul dès qu'un relevé récent est importé.
 >   sans import muette, et pas de fuite entre orgs.
 
 ---
->>>>>>> origin/main
 
 ## v1.242.0 — 18/09/2026 à 18:25 — Les documents d'un placement vivent sur son contrat
 
