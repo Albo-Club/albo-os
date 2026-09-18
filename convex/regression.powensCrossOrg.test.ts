@@ -4,14 +4,18 @@
  * the Powens connection that feeds it.
  *
  * One bank login carries the accounts of several companies of the group (a
- * Palatine access holding the current accounts of two SCIs). The connection
- * stays with the org that created it; each account is reassigned to its own
- * company (`cash.moveAccountToOrg`), which stamps `powensFeedOrgId`.
+ * Palatine access holding the current accounts of two SCIs). The link is
+ * declared ONCE between the two orgs (`powensFeedGrants`, admin of both);
+ * the connection stays with the org that created it; each account is then
+ * attached to its own company (`cash.moveAccountToOrg`).
  *
  * Invariants under test:
- * - the move carries the transactions and refuses to break existing links;
- * - `powensFeedOrgId` is the ONLY thing that lets a Powens user write
- *   outside its own org — nothing else does;
+ * - a grant needs an admin on both sides, and cannot be removed while an
+ *   account still depends on it;
+ * - the move needs the grant, carries the transactions and refuses to break
+ *   existing links;
+ * - the grant is the ONLY thing that lets a Powens user write outside its
+ *   own org — nothing else does;
  * - a reconnection (new connection id, new account ids) takes the moved
  *   account over instead of duplicating it back into the feed org;
  * - the connection keeps listing the account it feeds, from the feed org.
@@ -64,10 +68,10 @@ function payloadAccount(
 
 /**
  * Feed org (holds the Powens connection and one Palatine account) + target
- * org (the SCI the account really belongs to). Alice is admin on both, Bob
- * only on the feed org.
+ * org (the SCI the account really belongs to), linked by a grant. Alice is
+ * admin on both, Bob only on the feed org.
  */
-async function setup() {
+async function setup(opts: { grant?: boolean } = {}) {
   const t: Harness = setupHarness()
   const alice = await createUser(t, 'alice@test.dev')
   const bob = await createUser(t, 'bob@test.dev')
@@ -96,6 +100,12 @@ async function setup() {
       powensAccountId: 'acct-1',
     })
   })
+  if (opts.grant ?? true) {
+    await alice.as.mutation(api.feedGrants.create, {
+      feedOrgId: feed.orgId,
+      hostOrgId: target.orgId,
+    })
+  }
   return { t, alice, bob, feed, target, accountId }
 }
 
@@ -122,8 +132,91 @@ async function ingest(
   })
 }
 
+describe('feedGrants', () => {
+  test('needs an admin on both orgs, refuses a self-link and a duplicate', async () => {
+    const s = await setup({ grant: false })
+    // Bob is owner of the feed org but not a member of the target one.
+    await expectConvexError(
+      s.bob.as.mutation(api.feedGrants.create, {
+        feedOrgId: s.feed.orgId,
+        hostOrgId: s.target.orgId,
+      }),
+      'not_a_member',
+    )
+    await expectConvexError(
+      s.alice.as.mutation(api.feedGrants.create, {
+        feedOrgId: s.feed.orgId,
+        hostOrgId: s.feed.orgId,
+      }),
+      'same_org',
+    )
+    await s.alice.as.mutation(api.feedGrants.create, {
+      feedOrgId: s.feed.orgId,
+      hostOrgId: s.target.orgId,
+    })
+    await expectConvexError(
+      s.alice.as.mutation(api.feedGrants.create, {
+        feedOrgId: s.feed.orgId,
+        hostOrgId: s.target.orgId,
+      }),
+      'already_linked',
+    )
+  })
+
+  test('reads from both sides', async () => {
+    const s = await setup()
+    const fromFeed = await s.alice.as.query(api.feedGrants.list, {
+      orgId: s.feed.orgId,
+    })
+    expect(fromFeed.feeding.map((g) => g.org.slug)).toEqual(['target-org'])
+    expect(fromFeed.fedBy).toEqual([])
+    const fromTarget = await s.alice.as.query(api.feedGrants.list, {
+      orgId: s.target.orgId,
+    })
+    expect(fromTarget.feeding).toEqual([])
+    expect(fromTarget.fedBy.map((g) => g.org.slug)).toEqual(['feed-org'])
+  })
+
+  test('cannot be removed while an account still depends on it', async () => {
+    const s = await setup()
+    await ingest(s.t, [payloadAccount()])
+    await moveToTarget(s)
+    const { fedBy } = await s.alice.as.query(api.feedGrants.list, {
+      orgId: s.target.orgId,
+    })
+    await expectConvexError(
+      s.alice.as.mutation(api.feedGrants.remove, { grantId: fedBy[0]._id }),
+      'grant_in_use:1',
+    )
+    // Back home, nothing depends on the link any more.
+    await s.alice.as.mutation(api.cash.moveAccountToOrg, {
+      bankAccountId: s.accountId,
+      targetOrgId: s.feed.orgId,
+      ownerCompanyId: s.feed.rootCompanyId,
+    })
+    await s.alice.as.mutation(api.feedGrants.remove, { grantId: fedBy[0]._id })
+    const after = await s.alice.as.query(api.feedGrants.list, {
+      orgId: s.target.orgId,
+    })
+    expect(after.fedBy).toEqual([])
+  })
+})
+
 describe('moveAccountToOrg', () => {
-  test('carries the account, its transactions and the feed-org stamp', async () => {
+  test('refuses a Powens-fed account without a link between the orgs', async () => {
+    const s = await setup({ grant: false })
+    await ingest(s.t, [payloadAccount()])
+    await expectConvexError(
+      s.alice.as.mutation(api.cash.moveAccountToOrg, {
+        bankAccountId: s.accountId,
+        targetOrgId: s.target.orgId,
+        ownerCompanyId: s.target.rootCompanyId,
+      }),
+      'no_feed_grant',
+    )
+  })
+
+  test('carries the account and its transactions', async () => {
     const s = await setup()
     await ingest(s.t, [payloadAccount({ txId: 'tx-1' })])
 
@@ -140,14 +233,13 @@ describe('moveAccountToOrg', () => {
     }))
     expect(account?.orgId).toBe(s.target.orgId)
     expect(account?.ownerCompanyId).toBe(s.target.rootCompanyId)
-    // The authorization that lets the feed org keep writing here.
-    expect(account?.powensFeedOrgId).toBe(s.feed.orgId)
     expect(transactions).toHaveLength(1)
     expect(transactions[0].orgId).toBe(s.target.orgId)
   })
 
-  test('coming back home clears the feed-org stamp', async () => {
+  test('coming back to the feed org needs no link', async () => {
     const s = await setup()
+    await ingest(s.t, [payloadAccount()])
     await moveToTarget(s)
     await s.alice.as.mutation(api.cash.moveAccountToOrg, {
       bankAccountId: s.accountId,
@@ -158,7 +250,6 @@ describe('moveAccountToOrg', () => {
       ctx.db.get('bankAccounts', s.accountId),
     )
     expect(account?.orgId).toBe(s.feed.orgId)
-    expect(account?.powensFeedOrgId).toBeUndefined()
   })
 
   test('refuses a matched transaction, a placement, a loan', async () => {
@@ -325,15 +416,14 @@ describe('ingestion of a moved account', () => {
     expect(accounts[0].powensConnectionId).toBe('conn-2')
   })
 
-  test('an account of another org that nothing feeds from here is refused', async () => {
-    const s = await setup()
-    // Same account, moved WITHOUT the feed stamp (as a hand-made row would
-    // be): the Powens user of the feed org must not write into it.
+  test('an account of another org with no link is refused', async () => {
+    const s = await setup({ grant: false })
+    // Same account, living in the target org WITHOUT a grant (as a hand-made
+    // row would): the Powens user of the feed org must not write into it.
     await s.t.run(async (ctx) => {
       await ctx.db.patch('bankAccounts', s.accountId, {
         orgId: s.target.orgId,
         ownerCompanyId: s.target.rootCompanyId,
-        powensFeedOrgId: undefined,
       })
     })
     await ingest(s.t, [payloadAccount({ txId: 'tx-refused' })])
@@ -342,6 +432,35 @@ describe('ingestion of a moved account', () => {
       ctx.db.query('transactions').collect(),
     )
     expect(transactions).toHaveLength(0)
+  })
+
+  test('a reconnection never duplicates an account of an org with no link', async () => {
+    const s = await setup({ grant: false })
+    // The target org holds its own Palatine account, same IBAN — a real
+    // account the feed org has NO right over. A reconnection on the feed
+    // org's side must neither take it over nor see it.
+    await s.t.run(async (ctx) => {
+      await ctx.db.patch('bankAccounts', s.accountId, {
+        orgId: s.target.orgId,
+        ownerCompanyId: s.target.rootCompanyId,
+      })
+    })
+    await ingest(
+      s.t,
+      [payloadAccount({ powensAccountId: 'acct-99', txId: 'tx-new' })],
+      'conn-2',
+    )
+    const accounts = await s.t.run((ctx) =>
+      ctx.db.query('bankAccounts').collect(),
+    )
+    // The feed org gets its own row; the target's stays untouched.
+    expect(accounts).toHaveLength(2)
+    const target = accounts.find((a) => a._id === s.accountId)
+    expect(target?.powensAccountId).toBe('acct-1')
+    expect(target?.powensConnectionId).toBe(CONNECTION)
+    const created = accounts.find((a) => a._id !== s.accountId)
+    expect(created?.orgId).toBe(s.feed.orgId)
+    expect(created?.powensAccountId).toBe('acct-99')
   })
 })
 

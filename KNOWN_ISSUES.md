@@ -2652,9 +2652,9 @@ Seule env var requise : `POWENS_WEBHOOK_SECRET` (clé du provider HMAC Powens).
   par Albo OS re-syncent encore : sans ce filtre, elles créaient des comptes
   fantômes. Webhook d'un user inconnu → warning `[powens] webhook ignoré:
 id_user inconnu (X)` + réponse 200, **rien n'est écrit**. Conséquence :
-  l'**org d'ingestion vient du `powensUsers` matché** (source de vérité), le
-  mapping connecteur→entité ne sert qu'à choisir l'entité propriétaire et doit
-  concorder avec cette org (`connector_org_mismatch` sinon).
+  l'**org d'ingestion vient du `powensUsers` matché** (source de vérité) ;
+  la seule sortie de cette org est un lien `powensFeedGrants` (point « Un
+  accès bancaire n'appartient pas à une seule société » plus bas).
 
 - **HMAC : pas de `crypto.timingSafeEqual` dans le runtime Convex.** L'isolate
   V8 n'expose pas l'API `crypto` de Node ; on vérifie via Web Crypto
@@ -2768,61 +2768,71 @@ Uint8Array(enc.encode(s))` produit bien de l'`ArrayBuffer`-backed.
 - **Idempotence par `powensTxId`** (index `by_powens_id`) : `patch` si existe,
   sinon `insert`. Rejouable sans effet de bord. Montants Powens = unité
   monétaire signée → `round(abs(value)*100)` cents + `direction` selon le signe.
-- **Mapping connecteur → entité** (constante `CONNECTOR_OWNER`, comptes neufs
-  uniquement) : Palatine / Wormser / Neuflize → CALTE (org calte) ; Mémo Bank →
-  Albo Club (org albo). Qonto n'y figure pas (toujours résolu par match du
-  record existant). Le mapping ne choisit **que** la société propriétaire et
-  le libellé de banque — l'org d'écriture, elle, vient toujours du `powensUsers`
-  matché ; un mapping qui la contredit lève `connector_org_mismatch`.
-- **Un connecteur non mappé n'est PAS une erreur.** Il l'a été jusqu'en
-  09/2026 (`unmapped_powens_account`), et le prix était disproportionné : la
-  mutation étant transactionnelle, une banque inconnue faisait **tout** échouer
-  (500 à Powens, qui suspend ses renvois), donc aucun compte, aucune
-  transaction, un écran vide et un mail d'alerte Powens pour seule trace — et
-  toute nouvelle banque exigeait un déploiement. Le compte est désormais créé
-  dans l'org du user Powens, sous sa société racine (`group_root`), au nom du
-  connecteur, puis **rattaché** à sa vraie société par un admin — le geste que
-  l'accès Palatine réclame déjà pour ses SCI (point suivant). Rien n'est
-  deviné : l'org ne l'a jamais été, et le reste est corrigeable depuis la
-  fiche compte (renommage, rattachement).
-- **Un accès bancaire n'appartient pas à une seule société.** Le mapping
-  ci-dessus est par **connecteur**, jamais par compte : l'accès Palatine de
-  CALTE porte aussi les comptes courants des SCI Chapelle 1 et 2, et tout
-  serait donc créé dans `calte`, propriété de CALTE — en silence, sans erreur,
-  avec pour conséquence une position TVA de CALTE qui intègre les flux des
-  SCI (`getVatPosition` somme toute l'org) et un solde de départ de
-  prévisionnel faux des deux côtés. La création n'a pas été rendue
-  « intelligente » (routage par IBAN en dur = un déploiement par compte) :
-  le compte naît dans l'org de la connexion, puis un admin le **rattache** à
-  sa société depuis la fiche compte (`cash.moveAccountToOrg`). Le geste est
-  humain, générique, et rejoue le patron du pointage (l'app liste, l'humain
-  choisit).
+- **Aucun nom de banque ni de société dans le code.** Jusqu'au 18/09/2026,
+  une constante `CONNECTOR_OWNER` câblait quatre connecteurs sur deux orgs
+  (Palatine / Wormser / Neuflize → CALTE, Mémo Bank → Albo) et **levait**
+  `connector_org_mismatch` quand une autre org connectait l'une de ces
+  banques : 500 à Powens, qui suspend ses renvois — exactement le prix payé
+  plus tôt par `unmapped_powens_account` (une banque inconnue faisait tout
+  échouer, et toute nouvelle banque exigeait un déploiement). Le mapping
+  contredisait aussi le modèle « une société = une org » : une filiale qui
+  connectait **son propre** accès Palatine tombait dessus. Il a été retiré
+  sans remplaçant : tout compte neuf naît dans l'org du user Powens, sous sa
+  société racine (`group_root`), au nom du connecteur tel que Powens le livre,
+  puis est **rattaché** à sa vraie société par un admin. Rien n'est deviné —
+  l'org ne l'a jamais été, le reste se corrige depuis la fiche compte.
+  Conséquence sur la reprise de lien : les records importés d'Airtable portent
+  un libellé court (« Palatine ») là où le connecteur dit « Banque Palatine »,
+  et rien ne traduit plus l'un en l'autre — `matchExistingAccount` compare donc
+  les banques par **inclusion** (`sameBank`), les règles 2 et 3 exigeant de
+  toute façon le libellé du compte ou un compte unique.
+- **Un accès bancaire n'appartient pas à une seule société.** L'accès
+  Palatine de CALTE porte aussi les comptes courants des SCI Chapelle 1 et 2,
+  et tout est donc créé dans `calte`, propriété de CALTE — avec pour
+  conséquence, tant que rien n'est rattaché, une position TVA de CALTE qui
+  intègre les flux des SCI (`getVatPosition` somme toute l'org) et un solde
+  de départ de prévisionnel faux des deux côtés. La création n'a pas été
+  rendue « intelligente » (routage par IBAN en dur = un déploiement par
+  compte) : le compte naît dans l'org de la connexion, puis un admin le
+  **rattache** à sa société depuis la fiche compte (`cash.moveAccountToOrg`).
+  Le geste est humain, générique, et rejoue le patron du pointage (l'app
+  liste, l'humain choisit).
 
   Trois conséquences à ne pas défaire :
 
-  1. **`powensFeedOrgId` est l'autorisation**, pas une commodité. C'est le
-     seul motif pour lequel l'ingestion accepte d'écrire hors de l'org du
-     user Powens ; sans ce tampon, un compte d'une autre org est **ignoré**
-     (warning, rien d'écrit). Il est posé par le rattachement, qui exige le
-     rôle admin sur les **deux** orgs — c'est la chaîne d'autorisation
-     complète. Il survit à une reconnexion, contrairement à
-     `powensConnectionId` qui change à chaque fois : c'est précisément
-     pourquoi le contrôle ne peut pas porter sur ce dernier.
+  1. **Le lien entre orgs est l'autorisation** (`powensFeedGrants`,
+     `feedOrgId` → `hostOrgId`, déclaré une fois dans Réglages → Intégrations
+     par un admin des **deux** orgs, lisible des deux côtés — le patron du
+     passif). C'est le seul motif pour lequel l'ingestion accepte d'écrire
+     hors de l'org du user Powens (`hasFeedGrant`) ; sans lien, un compte
+     d'une autre org est **ignoré** (warning, rien d'écrit), et le
+     rattachement d'un compte connecté est refusé (`no_feed_grant`). Le lien
+     porte sur les **orgs**, jamais sur `powensConnectionId` qui change à
+     chaque reconnexion, ni sur un tampon posé sur le compte (l'ancien
+     `powensFeedOrgId`, retiré : un même fait écrit sur chaque compte se
+     désynchronise, un lien déclaré une fois ne le peut pas). Retirer un lien
+     est refusé tant qu'un compte de l'org hôte est encore alimenté par une
+     connexion de l'org qui alimente (`grant_in_use`) — sinon l'ingestion se
+     mettrait à l'ignorer en silence.
   2. **« Les comptes d'une connexion » se lisent par connexion, jamais par
      org** (index `by_powens_connection`). `connectionAccounts`,
-     `listAccountsForBackfill` et `listConnections` le font : une lecture par
-     org ferait passer une connexion saine pour « obsolète » (elle
-     n'alimenterait plus rien de visible), donc éteindrait ses alertes, et le
-     rattrapage sauterait le compte déplacé en laissant un trou dans son
-     historique. Symétriquement, l'org d'accueil doit **exclure** ses comptes
-     à `powensFeedOrgId` étranger du scan des orphelins « untracked », sinon
-     elle affiche une fausse connexion morte.
+     `listAccountsForBackfill`, `listConnections` et `listIntegrations` le
+     font : une lecture par org ferait passer une connexion saine pour
+     « obsolète » (elle n'alimenterait plus rien de visible), donc éteindrait
+     ses alertes, et le rattrapage sauterait le compte déplacé en laissant un
+     trou dans son historique. Symétriquement, le scan des orphelins
+     « untracked » de l'org d'accueil ne retient qu'un compte dont la
+     connexion n'est suivie **nulle part** — un compte alimenté depuis une
+     autre org a sa connexion surveillée là-bas, l'afficher ici serait une
+     fausse connexion morte.
   3. **La reprise de lien d'une reconnexion doit voir les comptes déplacés.**
-     `matchExistingAccount` reçoit les comptes de l'org **plus** ceux qu'elle
-     alimente ailleurs (index `by_powens_feed_org`). Sans ça, une reconnexion
-     — qui redistribue de nouveaux ids de compte — ne reconnaîtrait plus le
-     compte déplacé et en **recréerait un doublon** dans l'org de la
-     connexion.
+     `matchExistingAccount` reçoit les comptes de l'org **plus** ceux de
+     chaque org qu'elle est autorisée à alimenter (`hostOrgsOf`). Sans ça,
+     une reconnexion — qui redistribue de nouveaux ids de compte — ne
+     reconnaîtrait plus le compte déplacé et en **recréerait un doublon**
+     dans l'org de la connexion. Et pas plus large : sans lien, une org qui
+     tient un compte au même IBAN n'est ni vue ni reprise
+     (`regression.powensCrossOrg.test.ts`).
 
   Le rattachement est **refusé** dès que le compte est accroché à quelque
   chose de son org d'origine (transaction pointée, placement `deals.
@@ -3316,7 +3326,10 @@ complet est dans `CLAUDE.md` § « Modèle multi-org ».
 - **Powens est par org** (`powensUsers`, `powensConnections`) : une filiale =
   son propre user Powens et ses propres connexions bancaires. Rien n'était
   connecté pour les filiales avant ALB-128, donc il n'y a pas de reprise à
-  faire — seulement des branchements à créer.
+  faire — seulement des branchements à créer. Quand l'accès bancaire est
+  celui de CALTE (Palatine porte les comptes des SCI), le branchement est un
+  **lien entre orgs** (`powensFeedGrants`, Réglages → Intégrations) puis un
+  rattachement compte par compte — cf. § « Ingestion Powens ».
 
 ## Passif — `equityPositions` / `intercompanyLoans` / soldes dérivés (`convex/liabilities.ts`)
 

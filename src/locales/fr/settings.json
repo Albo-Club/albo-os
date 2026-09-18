@@ -187,6 +187,24 @@
         "paste": "Collez l'URL ci-dessus.",
         "signIn": "Connectez-vous avec votre compte Albo OS pour autoriser l'accès."
       }
+    },
+    "links": {
+      "title": "Liens entre organisations",
+      "description": "Un même accès bancaire peut porter les comptes de plusieurs sociétés du groupe. Un lien déclare que les connexions bancaires de cette organisation peuvent alimenter les comptes d'une autre ; il faut être administrateur des deux. Sans lien, chaque organisation reste totalement cloisonnée.",
+      "empty": "Aucun lien. Les connexions bancaires de cette organisation n'alimentent qu'elle-même.",
+      "feeding": "Cette organisation peut alimenter ses comptes",
+      "fedBy": "Ses connexions bancaires peuvent alimenter les comptes de cette organisation",
+      "addLabel": "Organisation à lier",
+      "addPlaceholder": "Choisir une organisation à alimenter",
+      "add": "Ajouter le lien",
+      "toasts": {
+        "added": "Lien ajouté.",
+        "addError": "Impossible d'ajouter le lien. Il faut être administrateur des deux organisations.",
+        "removed": "Lien retiré.",
+        "removeError": "Impossible de retirer le lien.",
+        "inUse": "Impossible : {{count}} compte de cette organisation est encore alimenté par ce lien. Rattachez-le à l'organisation d'origine ou archivez-le d'abord.",
+        "inUse_other": "Impossible : {{count}} comptes de cette organisation sont encore alimentés par ce lien. Rattachez-les à l'organisation d'origine ou archivez-les d'abord."
+      }
     }
   },
   "alerts": {

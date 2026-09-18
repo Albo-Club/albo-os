@@ -42,6 +42,7 @@ import type * as documentsClassify from "../documentsClassify.js";
 import type * as documentsExtract from "../documentsExtract.js";
 import type * as email from "../email.js";
 import type * as emailTemplates from "../emailTemplates.js";
+import type * as feedGrants from "../feedGrants.js";
 import type * as files from "../files.js";
 import type * as forecasts from "../forecasts.js";
 import type * as guarantees from "../guarantees.js";
@@ -215,6 +216,7 @@ declare const fullApi: ApiFromModules<{
   documentsExtract: typeof documentsExtract;
   email: typeof email;
   emailTemplates: typeof emailTemplates;
+  feedGrants: typeof feedGrants;
   files: typeof files;
   forecasts: typeof forecasts;
   guarantees: typeof guarantees;

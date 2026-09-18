@@ -58,6 +58,30 @@ besoin.
 Toute nouvelle plateforme à connecter déclarée au registre apparaîtra
 automatiquement dans cette liste, formulaire de connexion compris.
 
+## Liens entre organisations (accès bancaire partagé)
+
+Par défaut, chaque organisation est **totalement cloisonnée** : ses
+connexions bancaires n'alimentent que ses propres comptes, et une société
+extérieure qui connecte la même banque que vous (Palatine, Mémo Bank…) ne
+croise jamais vos données — l'app ne connaît aucune banque « à l'avance ».
+
+Dans le groupe, un même accès en banque porte pourtant les comptes de
+plusieurs sociétés (l'accès Palatine de CALTE porte aussi les comptes des
+SCI Chapelle). C'est un **lien entre organisations** qui l'autorise, déclaré
+une fois dans la carte **« Liens entre organisations »** de cette page :
+« les connexions bancaires de CALTE peuvent alimenter les comptes de SCI
+Chapelle ». Il faut être administrateur des **deux** organisations ; le lien
+est visible des deux côtés (CALTE voit qui elle alimente, la SCI voit par qui
+elle est alimentée), et se retire au même endroit. Un lien encore utilisé —
+un compte de la SCI toujours alimenté par une connexion de CALTE — ne se
+retire pas : on rattache le compte à son organisation d'origine (ou on
+l'archive) d'abord.
+
+Le lien ne déplace rien tout seul : les comptes arrivent toujours chez la
+société qui a lancé la connexion, puis se **rattachent** un par un depuis
+leur page (voir [Trésorerie](07-tresorerie.md)) — et c'est ce rattachement
+qui exige le lien.
+
 ## Attio (CRM dealflow)
 
 **La frontière** : Attio est la source de vérité *avant* l'investissement
@@ -91,8 +115,11 @@ Powens notifie Albo OS, qui met à jour les soldes et ingère les nouvelles
 transactions — sans jamais dupliquer ni écraser le pointage déjà fait (voir
 [Trésorerie](07-tresorerie.md)).
 
-Chaque connexion bancaire est rattachée à la bonne organisation et à l'entité
-titulaire du compte.
+Chaque connexion bancaire appartient à l'organisation qui l'a créée : ses
+comptes y arrivent, sous la société racine, au nom que la banque leur donne,
+puis se rattachent à leur vraie société. Alimenter les comptes d'une autre
+organisation du groupe passe par un lien déclaré (voir « Liens entre
+organisations » plus haut).
 
 Chaque compte livré par une synchronisation est d'abord **rapproché des
 comptes déjà connus** — par IBAN, sinon par banque et libellé identiques,

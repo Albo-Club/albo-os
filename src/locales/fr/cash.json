@@ -59,7 +59,7 @@
   "move": {
     "action": "Rattacher",
     "title": "Rattacher à une autre société",
-    "description": "Un même accès bancaire peut porter les comptes de plusieurs sociétés du groupe. La connexion reste là où elle a été créée ; le compte, lui, rejoint la société à qui il appartient.",
+    "description": "Un même accès bancaire peut porter les comptes de plusieurs sociétés du groupe. La connexion reste là où elle a été créée ; le compte, lui, rejoint la société à qui il appartient. Un compte connecté ne peut rejoindre qu'une société liée à celle-ci (Réglages → Intégrations).",
     "orgLabel": "Société",
     "orgPlaceholder": "Choisir une société",
     "ownerLabel": "Entité propriétaire",
@@ -72,8 +72,10 @@
       "account_used_by_deal": "Ce compte est adossé à un placement de la société actuelle. Détachez-le du placement d'abord.",
       "account_used_by_loan": "Ce compte est le compte de prélèvement d'un prêt. Changez-le sur le prêt d'abord.",
       "insufficient_role": "Il faut être administrateur des deux sociétés pour rattacher un compte.",
-      "default": "Impossible de rattacher le compte. Réessayez."
-    }
+      "default": "Impossible de rattacher le compte. Réessayez.",
+      "no_feed_grant": "Aucun lien entre les deux sociétés. Déclarez-le d'abord dans Réglages → Intégrations."
+    },
+    "noLink": "Aucune société liée à celle-ci. Déclarez d'abord le lien dans Réglages → Intégrations."
   },
   "connect": {
     "button": "Connecter une banque",

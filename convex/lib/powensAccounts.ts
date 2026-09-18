@@ -43,8 +43,8 @@ export type MatchCandidate = {
   archivedAt?: number
 }
 
-/** The payload account being resolved. `bankName` is our own bank label
- * (connector → entity mapping) or, failing that, the connector name. */
+/** The payload account being resolved. `bankName` is the Powens connector
+ * name, as delivered. */
 export type IncomingAccount = {
   bankName: string
   accountName?: string
@@ -53,6 +53,17 @@ export type IncomingAccount = {
    * renamed account still be recognized (the Qonto record imported from
    * Airtable, whose label never matches the bank's). */
   soleAccountOfBank: boolean
+}
+
+/** Same bank? Equal once squashed, or one name contained in the other: the
+ * records imported from Airtable carry the short label ("Palatine") while
+ * Powens delivers the connector's full name ("Banque Palatine"), and nothing
+ * in the code maps one to the other any more. Rules 2 and 3 also require the
+ * account label, or a lone account, so a broad match cannot bind by itself. */
+export function sameBank(a: string, b: string): boolean {
+  const x = squashName(a)
+  const y = squashName(b)
+  return x === y || x.includes(y) || y.includes(x)
 }
 
 export type AccountMatch =
@@ -67,7 +78,8 @@ export type AccountMatch =
  *    ALREADY linked to another (stale) Powens id: same IBAN = same account.
  * 2. **Same bank + same account name**, among the records not yet linked —
  *    catches the accounts Powens delivers without an IBAN (nantissement,
- *    titres).
+ *    titres). "Same bank" tolerates the connector's full name against a
+ *    short recorded label (cf. `sameBank`).
  * 3. **Lone account of a lone record** — the connection delivers a single
  *    account for that bank and the org holds a single unlinked record for
  *    it. Covers the renamed account (Qonto).
@@ -94,7 +106,7 @@ export function matchExistingAccount(
   const pool = live.filter(
     (c) =>
       !c.powensAccountId &&
-      squashName(c.bankName) === squashName(incoming.bankName) &&
+      sameBank(c.bankName, incoming.bankName) &&
       !(iban && c.iban && normalizeIban(c.iban) !== iban),
   )
 

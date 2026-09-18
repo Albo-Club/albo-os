@@ -5,15 +5,18 @@
  *
  * Two failures seen in production on a Natixis Wealth Management access
  * connected to CALTE (09/2026):
- * - the connector was absent from `CONNECTOR_OWNER`, so the ingestion threw
- *   `unmapped_powens_account`, the whole webhook transaction was rolled back
- *   and NOTHING appeared — a new bank required a deploy;
+ * - the connector was absent from a hard-coded connector → org mapping, so
+ *   the ingestion threw, the whole webhook transaction was rolled back and
+ *   NOTHING appeared — a new bank required a deploy;
  * - the cutover floor sat at the account's creation date, so the history
  *   Powens delivered with that first sync was dropped on the floor.
  *
+ * The mapping is gone since: no bank and no company is named in the code.
+ *
  * Invariants under test:
- * - an unmapped connector creates the account in the org of the Powens user,
- *   under its root company, named after the connector;
+ * - any connector creates the account in the org of the Powens user, under
+ *   its root company, named after the connector — and a second org
+ *   connecting the same bank gets its own account, sealed from the first;
  * - an account only Powens feeds has no cutover floor: everything delivered
  *   is ingested, however old;
  * - an account carrying a history of another origin (manual entry, CSV
@@ -86,7 +89,7 @@ async function ingest(
   })
 }
 
-describe('unmapped connector', () => {
+describe('new bank', () => {
   test('creates the account in the org of the connection, under its root company', async () => {
     const { t, org } = await setup()
 
@@ -109,28 +112,59 @@ describe('unmapped connector', () => {
     })
   })
 
-  test('a mapped connector still names its own entity and bank', async () => {
+  test('a second org connecting the same bank is sealed from the first', async () => {
     const { t, org } = await setup()
-    await t.run(async (ctx) => {
-      await ctx.db.insert('companies', {
-        orgId: org.orgId,
-        name: 'CALTE',
-        kind: 'group_entity',
-      })
-    })
-
     await ingest(t, [
       payloadAccount({ connectorName: 'Banque Palatine', powensAccountId: 'acct-pal' }),
     ])
+    // Another org — a third party, or a subsidiary with its own login —
+    // connects the very same bank under its own Powens user.
+    const other = await createOrg(t, 'other-org', [
+      { userId: (await createUser(t, 'carol@test.dev')).userId, role: 'owner' },
+    ])
+    await t.run(async (ctx) => {
+      await ctx.db.insert('powensUsers', {
+        orgId: other.orgId,
+        powensUserId: 'powens-user-other',
+        authToken: 'token-other',
+        createdAt: Date.now(),
+      })
+    })
+    await t.mutation(internal.powens.ingestConnectionSync, {
+      connectionId: 'conn-other',
+      powensUserId: 'powens-user-other',
+      accounts: [
+        {
+          ...payloadAccount({
+            connectorName: 'Banque Palatine',
+            powensAccountId: 'acct-other',
+            txId: 'tx-other',
+          }),
+          accountName: 'COMPTE COURANT',
+        },
+      ],
+    })
 
-    const account = await t.run(async (ctx) =>
+    const theirs = await t.run(async (ctx) =>
+      ctx.db
+        .query('bankAccounts')
+        .withIndex('by_org', (q) => q.eq('orgId', other.orgId))
+        .collect(),
+    )
+    expect(theirs).toHaveLength(1)
+    expect(theirs[0]).toMatchObject({
+      bankName: 'Banque Palatine',
+      ownerCompanyId: other.rootCompanyId,
+      powensAccountId: 'acct-other',
+    })
+    const ours = await t.run(async (ctx) =>
       ctx.db
         .query('bankAccounts')
         .withIndex('by_org', (q) => q.eq('orgId', org.orgId))
-        .first(),
+        .collect(),
     )
-    expect(account?.bankName).toBe('Palatine')
-    expect(account?.ownerCompanyId).not.toBe(org.rootCompanyId)
+    expect(ours).toHaveLength(1)
+    expect(ours[0].powensAccountId).toBe('acct-pal')
   })
 })
 

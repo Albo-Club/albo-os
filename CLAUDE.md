@@ -202,8 +202,10 @@ Albo OS = OS de pilotage du family office **CALTE** + holding d'invest
 - Les orgs sont **à plat** : aucune n'est « dans » une autre, il n'y a pas
   d'org mère. Ce qui relie deux sociétés du groupe, ce sont des **liens de
   passif** (`equityPositions` pour le capital, `intercompanyLoans` pour les
-  comptes courants), lisibles des deux côtés — patron déjà en place entre
-  CALTE et Albo. Corollaire : **pas de vue consolidée groupe** hors
+  comptes courants) et, pour l'alimentation bancaire, un **lien déclaré**
+  (`powensFeedGrants` : les connexions de A peuvent alimenter les comptes de
+  B) — lisibles des deux côtés, jamais déduits d'un nom de banque. Patron
+  déjà en place entre CALTE et Albo. Corollaire : **pas de vue consolidée groupe** hors
   `/app/all`, et une org à la fois pour le pointage comme pour l'agent IA.
 - `companies.kind = "group_*"` = les **entités juridiques** d'une org (sa
   racine `group_root` + sous-entités) ; `portfolio` = les boîtes investies.

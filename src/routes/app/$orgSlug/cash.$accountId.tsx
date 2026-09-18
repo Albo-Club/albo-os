@@ -303,15 +303,21 @@ function EditAccountDialog({
  * carry the accounts of several companies (a Palatine access holding the
  * current accounts of two SCIs): the Powens connection stays with the org
  * that created it, while the account — and its transactions — joins the org
- * that owns it. The server refuses the move as soon as the account is tied to
- * something in its current org (cf. `cash.moveAccountToOrg`).
+ * that owns it. A connected account can only go to an org linked to this one
+ * (Réglages → Intégrations); the server refuses the move as soon as the
+ * account is tied to something in its current org (cf. `cash.moveAccountToOrg`).
  */
 function MoveAccountDialog({
   account,
   orgSlug,
   onClose,
 }: {
-  account: { _id: Id<'bankAccounts'>; label: string; displayName: string | null }
+  account: {
+    _id: Id<'bankAccounts'>
+    label: string
+    displayName: string | null
+    isConnected: boolean
+  }
   orgSlug: string
   onClose: () => void
 }) {
@@ -323,12 +329,27 @@ function MoveAccountDialog({
   const [ownerCompanyId, setOwnerCompanyId] = useState('')
   const [pending, setPending] = useState(false)
 
-  // Only the orgs where the move is allowed: admin on both sides.
+  const currentOrgId =
+    me?.kind === 'ready'
+      ? (me.orgs.find((o) => o.slug === orgSlug)?._id ?? null)
+      : null
+  const grants = useConvexQuery(
+    api.feedGrants.list,
+    currentOrgId ? { orgId: currentOrgId } : 'skip',
+  )
+  // Only the orgs where the move is allowed: admin on both sides, and for a
+  // connected account, linked to this org in either direction — the link is
+  // what lets the connection keep feeding the account from here.
+  const linkedIds = new Set(
+    [...(grants?.feeding ?? []), ...(grants?.fedBy ?? [])].map((g) => g.org._id),
+  )
   const orgs =
     me?.kind === 'ready'
       ? me.orgs.filter(
           (o) =>
-            o.slug !== orgSlug && (o.role === 'owner' || o.role === 'admin'),
+            o.slug !== orgSlug &&
+            (o.role === 'owner' || o.role === 'admin') &&
+            (!account.isConnected || linkedIds.has(o._id)),
         )
       : []
   const target = orgs.find((o) => o._id === targetOrgId) ?? null
@@ -361,6 +382,7 @@ function MoveAccountDialog({
         'account_used_by_deal',
         'account_used_by_loan',
         'insufficient_role',
+        'no_feed_grant',
       ]
       toast.error(
         t(
@@ -423,6 +445,11 @@ function MoveAccountDialog({
             </Select>
           </div>
           <p className="text-muted-foreground text-xs">{t('cash:move.hint')}</p>
+          {account.isConnected && orgs.length === 0 && (
+            <p className="text-muted-foreground text-xs">
+              {t('cash:move.noLink')}
+            </p>
+          )}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={pending}>

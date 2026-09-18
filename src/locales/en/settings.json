@@ -187,6 +187,24 @@
         "paste": "Paste the URL above.",
         "signIn": "Sign in with your Albo OS account to authorize access."
       }
+    },
+    "links": {
+      "title": "Links between organizations",
+      "description": "One bank login can carry the accounts of several companies of the group. A link declares that this organization's bank connections may feed another organization's accounts; you must be an admin of both. Without a link, every organization stays fully sealed.",
+      "empty": "No link. This organization's bank connections only feed itself.",
+      "feeding": "This organization may feed its accounts",
+      "fedBy": "Its bank connections may feed this organization's accounts",
+      "addLabel": "Organization to link",
+      "addPlaceholder": "Pick an organization to feed",
+      "add": "Add link",
+      "toasts": {
+        "added": "Link added.",
+        "addError": "Couldn't add the link. You must be an admin of both organizations.",
+        "removed": "Link removed.",
+        "removeError": "Couldn't remove the link.",
+        "inUse": "Not possible: {{count}} account of that organization is still fed through this link. Reassign it to its origin organization or archive it first.",
+        "inUse_other": "Not possible: {{count}} accounts of that organization are still fed through this link. Reassign them to their origin organization or archive them first."
+      }
     }
   },
   "alerts": {

@@ -59,7 +59,7 @@
   "move": {
     "action": "Reassign",
     "title": "Reassign to another company",
-    "description": "One bank login can carry the accounts of several companies of the group. The connection stays where it was created; the account joins the company that owns it.",
+    "description": "One bank login can carry the accounts of several companies of the group. The connection stays where it was created; the account joins the company that owns it. A connected account can only join a company linked to this one (Settings → Integrations).",
     "orgLabel": "Company",
     "orgPlaceholder": "Pick a company",
     "ownerLabel": "Owning entity",
@@ -72,8 +72,10 @@
       "account_used_by_deal": "This account backs a placement of the current company. Detach it from the placement first.",
       "account_used_by_loan": "This account is a loan's direct-debit account. Change it on the loan first.",
       "insufficient_role": "You must be an admin of both companies to reassign an account.",
-      "default": "Could not reassign the account. Please try again."
-    }
+      "default": "Could not reassign the account. Please try again.",
+      "no_feed_grant": "No link between the two companies. Declare it in Settings → Integrations first."
+    },
+    "noLink": "No company is linked to this one. Declare the link in Settings → Integrations first."
   },
   "connect": {
     "button": "Connect a bank",

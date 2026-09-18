@@ -8,8 +8,8 @@
  * be rejected before touching anything.
  *
  * The one exception — a Powens connection feeding a bank account attached to
- * another org — is authorized by `bankAccounts.powensFeedOrgId` and covered
- * by `regression.powensCrossOrg.test.ts`, not here.
+ * another org — is authorized by a `powensFeedGrants` row and covered by
+ * `regression.powensCrossOrg.test.ts`, not here.
  */
 import { describe, expect, test } from 'vitest'
 import { api } from './_generated/api'
