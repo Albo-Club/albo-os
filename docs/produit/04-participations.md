@@ -107,6 +107,14 @@ La colonne principale, dans l'ordre de lecture :
   renvoi strictement identique ne relance rien ; et détacher un rapport la
   recalcule sur ce qui reste — s'il n'en reste aucun, la fiche repasse à
   « aucune donnée » plutôt que de garder une note devenue sans objet.
+- **D'où vient la note.** À côté du score, une ligne dit ce qu'il était
+  avant cette synthèse : « ↑ Avant : 6/10 · T1 2026 » en vert quand la
+  boîte remonte, « ↓ Avant : 6/10 · T1 2026 » en rouge quand elle recule,
+  « → Inchangée · T1 2026 » en gris quand le report n'a rien changé,
+  « Première note » quand c'est la première. La période citée est celle du
+  report sur lequel la note d'avant avait été calculée. Toute l'histoire de
+  la note se relit dans **Activité** (voir plus bas), une ligne par
+  synthèse.
 - **Ce que vaut le score de santé.** Il note l'entreprise, pas la qualité de
   son reporting, sur trois axes : trajectoire par rapport au plan,
   trésorerie et runway, solidité de la structure (rentabilité, gouvernance,
@@ -149,7 +157,11 @@ La colonne principale, dans l'ordre de lecture :
   retirées ; lien Attio ou lien Parallel posé ou retiré. Sur les **KPIs** :
   valeur saisie à la main ou confirmée dans le panneau IA, puis supprimée
   (les KPIs extraits d'un reporting sont couverts par la ligne du report).
-  Sur le **BP** d'un deal : version initiale ou révisée remplacée. Sur les
+  Sur le **BP** d'un deal : version initiale ou révisée remplacée. Sur la
+  **note de santé** : une ligne « Synthèse IA » à chaque synthèse, même
+  quand la note ne bouge pas — notée (première note), relevée ou abaissée de
+  x à y, maintenue — avec le verdict et le report qui l'a déclenchée ; lue de
+  haut en bas, la colonne donne toute l'évolution de la boîte. Sur les
   **règles de prévisionnel** rattachées à un deal : ajoutée (libellé, montant,
   fréquence), modifiée, activée ou désactivée, déplacée vers un autre deal,
   supprimée. Sur les **to-dos** rattachées à la société : créée, passée en
@@ -160,7 +172,8 @@ La colonne principale, dans l'ordre de lecture :
   du Passif) : le journal ne vit que sur la fiche d'une société. Une écriture
   confirmée dans le panneau IA est au nom de la personne qui l'a confirmée,
   avec la mention « via l'agent IA » ; celles des intégrations portent le nom
-  Attio ou Parallel et se replient quand elles s'enchaînent. Le journal
+  Attio, Parallel ou Synthèse IA et se replient quand la même source
+  enchaîne plusieurs lignes. Le journal
   commence à sa mise en service ; les créations de deals, pointages et
   dépointages, valorisations, documents, reports, créations et archivages de
   fiches, KPIs saisis à la main, BP, règles de deal et to-dos de société

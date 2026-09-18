@@ -105,7 +105,8 @@ ensuite.
   seuils de trésorerie franchis, les échéances en retard (celles dépassées
   de plus d'un jour sans avoir été rapprochées) et **les reports reçus dans
   la semaine, une carte par société** : logo, période couverte, note de
-  santé de la boîte et deux points clés du report — avec les liens pour
+  santé de la boîte avec la note d'avant (« ↑ Avant : 6/10 ») et deux
+  points clés du report — avec les liens pour
   aller traiter ce qui doit l'être. Rien à signaler = pas d'email. Chacun
   choisit les trois morceaux qu'il veut y voir depuis **Réglages →
   Membres** ; qui coupe les trois ne reçoit plus le point hebdo du tout.

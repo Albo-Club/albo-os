@@ -26,6 +26,7 @@ import { isAvailableAccount } from './lib/bankAccounts'
 import { effectiveCategory, isValidForecastCategory } from './lib/categories'
 import { companyLogoUrl } from './lib/domain'
 import { readAlertPrefs } from './lib/notificationPrefs'
+import { latestScoreEvolution } from './lib/scoreEvolution'
 import {
   addMonthsUtc,
   buildForecastGrid,
@@ -1451,6 +1452,10 @@ export const sendWeeklyDigest = internalMutation({
           period: report.reportPeriod,
           score: health?.score,
           scoreLabel: health?.label,
+          evolution:
+            health?.score !== undefined
+              ? ((await latestScoreEvolution(ctx, report.companyId)) ?? undefined)
+              : undefined,
           highlights: report.keyHighlights ?? [],
         })
       }

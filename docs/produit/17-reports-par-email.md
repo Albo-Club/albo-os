@@ -259,8 +259,9 @@ Chaque mail contient :
   précédent ;
 - **ce que dit ce report**, en trois points ;
 - **où en est la boîte** : la carte de synthèse IA de la fiche — note de
-  santé et verdict, résumé, points forts et points de vigilance, les trois
-  KPI suivis ;
+  santé et verdict, ce qu'elle était avant ce report (« ↑ Avant : 6/10 ·
+  T1 2026 », « → Inchangée », « Première note »), résumé, points forts et
+  points de vigilance, les trois KPI suivis ;
 - un **bouton** qui ouvre la fiche.
 
 Le mail attend que l'analyse de la boîte soit à jour avant de partir : il
@@ -305,8 +306,9 @@ points clés, synthèse — précédé de qui l'a transféré, dans un mail à p
 Ça vaut aussi pour un report déposé à la main depuis une fiche société.
 Chacun peut couper cet envoi sur sa ligne, case « Nouveaux reports ». La
 semaine entière, elle, se relit dans le **point hebdo du lundi**, qui reprend
-une carte par société — logo, période, note de santé et deux points clés
-(voir [Prévisionnel](09-previsionnel.md)).
+une carte par société — logo, période, note de santé avec la note d'avant
+sous la puce (« ↑ Avant : 6/10 », rien pour une première note) et deux
+points clés (voir [Prévisionnel](09-previsionnel.md)).
 
 **Quand le report était déjà là** — vous êtes deux à avoir transféré le même
 investor update — le second reçoit un accusé court : « ce report était déjà

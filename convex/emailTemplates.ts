@@ -11,6 +11,9 @@
  * sync with the front-end `auth` namespace where the flows overlap.
  */
 
+import { scoreDirection } from './lib/scoreEvolution'
+import type { ScoreEvolution } from './lib/scoreEvolution'
+
 export type EmailLocale = 'en' | 'fr'
 
 const APP_NAME = 'albo-os'
@@ -653,6 +656,8 @@ export type DigestReportItem = {
   /** AI health score of the company (0-10) and its label, when analysed. */
   score?: number
   scoreLabel?: string
+  /** Before → after of the latest synthesis; absent when unknown. */
+  evolution?: ScoreEvolution
   /** Key points of the report. The caller passes them all, two are shown. */
   highlights: Array<string>
 }
@@ -722,6 +727,10 @@ function reportCard(item: DigestReportItem): string {
     item.score !== undefined
       ? `<span style="display:inline-block;border:1px solid ${scoreColor(item.score)};color:${scoreColor(item.score)};font-size:11px;padding:2px 8px;border-radius:999px;line-height:1.4;white-space:nowrap;">${item.scoreLabel ? `${esc(item.scoreLabel)} · ` : ''}${item.score}/10</span>`
       : ''
+  const evolution =
+    item.score !== undefined
+      ? scoreEvolutionLine(item.score, item.evolution, false)
+      : null
   const points = item.highlights
     .slice(0, REPORT_EMAIL_MAX_HIGHLIGHTS)
     .map(
@@ -739,7 +748,7 @@ function reportCard(item: DigestReportItem): string {
         <div>${title}</div>
         ${item.period ? `<div style="color:${MUTED};font-size:12px;">${esc(item.period)}</div>` : ''}
       </td>
-      <td valign="middle" align="right">${chip}</td>
+      <td valign="middle" align="right" style="line-height:1.35;">${chip}${evolution ? `<div style="color:${evolution.color};font-size:11px;margin-top:4px;">${evolution.text}</div>` : ''}</td>
     </tr>
   </table>${
     points
@@ -1247,6 +1256,33 @@ function scoreColor(score: number): string {
   return TONE_NEGATIVE
 }
 
+/**
+ * The "before" line under a score: arrow + previous score, coloured by the
+ * direction (ALB-252). `withPeriod` adds the report the previous score came
+ * from — the fiche and the confirmation mail say it, the digest stays short.
+ * Empty for a first score when `withPeriod` is off: the chip alone is enough.
+ */
+function scoreEvolutionLine(
+  score: number,
+  evolution: ScoreEvolution | undefined,
+  withPeriod: boolean,
+): { text: string; color: string } | null {
+  if (!evolution) return null
+  const direction = scoreDirection(score, evolution)
+  if (direction === 'first') {
+    return withPeriod ? { text: 'Première note', color: MUTED } : null
+  }
+  const period =
+    withPeriod && evolution.previousReportLabel
+      ? ` · ${esc(evolution.previousReportLabel)}`
+      : ''
+  if (direction === 'same') return { text: `→ Inchangée${period}`, color: MUTED }
+  return {
+    text: `${direction === 'up' ? '↑' : '↓'} Avant&nbsp;: ${evolution.previousScore}/10${period}`,
+    color: direction === 'up' ? TONE_POSITIVE : TONE_NEGATIVE,
+  }
+}
+
 const MONTH_FMT = new Intl.DateTimeFormat('fr-FR', { month: 'short', year: 'numeric' })
 
 export interface ReportEntityCard {
@@ -1284,6 +1320,8 @@ export interface ReportEntityCard {
 export interface ReportSynthesis {
   score?: number
   scoreLabel?: string
+  /** Before → after of the latest synthesis; absent when unknown. */
+  evolution?: ScoreEvolution
   summary: string
   goodPoints: Array<string>
   badPoints: Array<string>
@@ -1413,6 +1451,7 @@ function synthesisCard(name: string, s: ReportSynthesis): string {
 
   if (s.score !== undefined) {
     const color = scoreColor(s.score)
+    const evolution = scoreEvolutionLine(s.score, s.evolution, true)
     blocks.push(`<table role="presentation" cellpadding="0" cellspacing="0" border="0">
   <tr>
     <td width="44" valign="middle" style="vertical-align:middle;padding-right:12px;">
@@ -1421,6 +1460,7 @@ function synthesisCard(name: string, s: ReportSynthesis): string {
     <td valign="middle" style="vertical-align:middle;">
       ${s.scoreLabel ? `<span style="font-weight:600;font-size:15px;">${esc(s.scoreLabel)}</span>` : ''}
       <span style="color:${MUTED};font-size:14px;">&nbsp;Score ${s.score}/10</span>
+      ${evolution ? `<div style="color:${evolution.color};font-size:13px;margin-top:2px;">${evolution.text}</div>` : ''}
     </td>
   </tr>
 </table>`)

@@ -13,6 +13,7 @@ import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
+import { scoreDirection } from '../../../convex/lib/scoreEvolution'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { directionBadgeClass } from '~/lib/moneyTone'
@@ -105,6 +106,11 @@ export function CompanyAiSynthesisBlock({
   const criticalAlert = (analysis.alerts ?? []).find(
     (a) => a.severity === 'critical',
   )
+  // Before → after of this synthesis, from the journal (ALB-252). Absent
+  // until the company has been scored since the journal records scores.
+  const evolution = intel?.scoreEvolution ?? null
+  const direction =
+    score !== null && evolution ? scoreDirection(score, evolution) : null
 
   return (
     <div className="bg-card space-y-4 rounded-xl border p-5">
@@ -135,6 +141,24 @@ export function CompanyAiSynthesisBlock({
             {score !== null && (
               <span className="text-muted-foreground text-sm">
                 {t('reports.synthesis.scoreValue', { score })}
+              </span>
+            )}
+            {direction && evolution && (
+              <span
+                className={cn(
+                  'text-sm',
+                  direction === 'up' && 'text-positive',
+                  direction === 'down' && 'text-destructive',
+                  (direction === 'same' || direction === 'first') &&
+                    'text-muted-foreground',
+                )}
+              >
+                {t(`reports.synthesis.evolution.${direction}`, {
+                  score: evolution.previousScore,
+                })}
+                {direction !== 'first' &&
+                  evolution.previousReportLabel &&
+                  ` · ${evolution.previousReportLabel}`}
               </span>
             )}
           </div>
