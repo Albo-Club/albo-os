@@ -51,14 +51,24 @@ La page empile huit blocs :
    ferait crier ce signal à chaque début de mois), et un bien **jamais loué**
    n'apparaît pas — il n'y a pas d'habitude à comparer. Chaque ligne renvoie
    vers la fiche du bien.
-8. **Reportings manquants** — les participations dont aucun rapport n'est
+8. **Relevés de titres à renouveler** — les banques dont le dernier relevé
+   importé a plus de **90 jours**. Quand la banque n'est pas couverte par la
+   connexion bancaire, ce relevé est la **seule** façon dont la valeur des
+   comptes-titres entre dans l'app : passé ce délai, les soldes affichés
+   datent d'autant. Une ligne **par banque**, pas par compte — un relevé les
+   couvre tous d'un coup, et trois lignes seraient trois rappels pour un seul
+   dépôt. C'est la date **du relevé** qui compte, jamais celle de l'import :
+   un relevé d'août déposé en novembre a trois mois dans les deux cas. Une
+   banque dont aucun relevé n'a jamais été importé n'apparaît pas — il n'y a
+   rien à renouveler. Chaque ligne renvoie vers les [placements](19-placements.md).
+9. **Reportings manquants** — les participations dont aucun rapport n'est
    arrivé depuis plus de **4 mois** (délai réglable par organisation dans
    Réglages → Général). Chaque ligne renvoie vers la fiche de la société.
 
 Tous les blocs sauf les tâches sont **automatiques** : un item disparaît de
 lui-même dès que l'action est faite (transaction pointée, banque
 reconnectée, échéance réalisée, prélèvement rattaché, estimation saisie,
-loyer encaissé et pointé, rapport reçu). Rien n'est stocké : chaque signal est **recalculé** à
+loyer encaissé et pointé, relevé importé, rapport reçu). Rien n'est stocké : chaque signal est **recalculé** à
 l'ouverture de la page.
 
 ## Points d'attention

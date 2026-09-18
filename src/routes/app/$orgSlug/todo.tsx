@@ -650,6 +650,46 @@ function Todo() {
         )}
       </TodoSection>
 
+      {/* A securities statement getting old. One line per statement reader,
+          not per account — one Natixis PDF covers the three accounts, so
+          three lines would be three reminders for a single upload. Only an
+          org that has already imported one is judged. */}
+      <TodoSection
+        title={t('staleStatements.title')}
+        count={data.staleStatements.length}
+      >
+        {data.staleStatements.length === 0 ? (
+          <EmptyHint label={t('staleStatements.empty')} />
+        ) : (
+          <>
+            <div className="divide-y rounded-lg border">
+              {data.staleStatements.map((row) => (
+                <div
+                  key={row.source}
+                  className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                >
+                  <Link
+                    to="/app/$orgSlug/placements"
+                    params={{ orgSlug }}
+                    className="truncate font-medium hover:underline"
+                  >
+                    {row.bankName}
+                  </Link>
+                  <span className="text-muted-foreground text-xs">
+                    {t('staleStatements.lastStatement', {
+                      date: fmtDate(row.lastStatementDate),
+                    })}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <p className="text-muted-foreground text-xs">
+              {t('staleStatements.subtitle')}
+            </p>
+          </>
+        )}
+      </TodoSection>
+
       <TodoSection
         title={t('reports.title')}
         count={data.missingReports.length}

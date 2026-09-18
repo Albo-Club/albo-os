@@ -65,5 +65,11 @@
     "empty": "No missing rent.",
     "lastRent": "last rent on {{date}}",
     "subtitle": "These properties collected a rent every month, and last month nothing arrived. The current month is never judged — a rent due on the 5th is not late on the 2nd. A property that has never been let does not show here: there is no habit to compare against."
+  },
+  "staleStatements": {
+    "title": "Statements to refresh",
+    "empty": "No statement to refresh.",
+    "lastStatement": "last statement dated {{date}}",
+    "subtitle": "The last statement imported for this bank is over 90 days old, so the value of the securities accounts it feeds is just as old. One line per bank — a statement covers all its accounts at once. A bank whose statement was never imported does not show up here: there is nothing to refresh."
   }
 }

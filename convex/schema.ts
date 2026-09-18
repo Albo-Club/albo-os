@@ -2118,10 +2118,11 @@ export default defineSchema({
    * file's lifetime, so nothing is left in storage without a referent.
    *
    * Deliberately light: it carries counts and dates, never the parsed
-   * payload. The Placements page reads it as a list to date the last import
-   * (and, later, to raise the "statement is getting old" To-do signal), and
-   * Convex bills the whole row on every read — a parked JSON blob would be
-   * paid for on every page load, for data already written to its real tables.
+   * payload. The Placements page reads it as a list to date the last import,
+   * and the To-do tab reads the latest date per source to raise the
+   * "statement is getting old" signal — and Convex bills the whole row on
+   * every read, so a parked JSON blob would be paid for on every page load,
+   * for data already written to its real tables.
    *
    * Uniqueness is (orgId, source, statementDate): re-importing the same
    * statement date CORRECTS the import in place rather than stacking a
