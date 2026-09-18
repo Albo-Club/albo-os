@@ -62,6 +62,31 @@ de chat :
 >   n'a été appelé ; `ActivityLine` rend `<Shimmer>`.
 > - i18n `chat.json` fr/en : `tool.state*` restaurés (badge du `ToolHeader`),
 >   `tool.calls`, `tool.call`, `tool.details`.
+## v1.240.1 — 18/09/2026 à 18:05 — Ménage : l'ancienne timeline d'e-mails a quitté la base
+
+Les deux tables de l'ancienne timeline d'e-mails, une fonctionnalité retirée
+de l'app depuis des mois, ont été vidées (65 messages, 78 rattachements)
+puis supprimées, et leurs 29 pièces jointes libérées du stockage. Rien ne
+change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : retrait de `companyEmails` et `companyEmailLinks`,
+>   vidées en prod le 18/09/2026 (`MIGRATIONS.md` « Purge de l'ancienne
+>   timeline d'e-mails ») ; `gmailAccounts` / `gmailOAuthStates` restent
+>   déclarées, à traiter de la même façon (purger, puis resserrer).
+> - Audit du stockage : `storageAudit.scanHolders`,
+>   `scripts/lib/storage-holders.mjs` et le docstring de `storagePurge.ts`
+>   passent de six à cinq champs porteurs (quatre vrais porteurs) ;
+>   `KNOWN_ISSUES.md` mis à jour au même compte.
+> - Les cinq migrations CALTE déjà exécutées (`mergeBillivCalte`,
+>   `reassignClimateHouseCofoDeals`, `cleanupCalteOrphanCompanies`,
+>   `cleanupCalteImport`, `archiveCalteBlockedCards`) ne comptent plus les
+>   lignes `companyEmailLinks` avant d'archiver ou de fusionner une fiche —
+>   contrôle sans objet sur une table qui n'existe plus, noté en commentaire.
+> - Supprimés avec les tables : `convex/migrations/purgeCompanyEmails.ts`,
+>   `scripts/purge-company-emails.mjs` et
+>   `convex/regression.purgeCompanyEmails.test.ts`.
 
 ## v1.240.0 — 18/09/2026 à 14:50 — L'assistant montre ce qu'il fait pendant qu'il cherche
 
