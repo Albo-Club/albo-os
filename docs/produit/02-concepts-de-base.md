@@ -80,7 +80,9 @@ Là où les organisations diffèrent vraiment, c'est **à l'intérieur
 d'Investissements**. Une SCI qui détient un immeuble n'a ni participation ni
 placement ; une holding d'investissement n'a pas de bien. Ses trois
 sous-sections — Entreprises, Placements, Immobilier — se règlent donc une par
-une, depuis le **⋯ tout à droite** de la barre d'onglets.
+une, depuis le **menu ⋯ en haut de la page**, sur la ligne du titre : celui
+qui porte déjà les actions de la page sur Entreprises, et un menu à lui à
+côté des boutons sur Placements et Immobilier.
 
 Le menu liste les trois avec leur état, et chaque ligne **se coche et se
 décoche** : on affiche une sous-section pour y créer son premier élément, on

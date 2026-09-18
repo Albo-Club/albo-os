@@ -13,6 +13,7 @@ import { CreatePlacementDialog } from '~/components/placements/CreatePlacementDi
 import { ImportStatementDialog } from '~/components/placements/ImportStatementDialog'
 import { PlacementsView } from '~/components/placements/PlacementsView'
 import { InvestmentsTabs } from '~/components/investments/InvestmentsTabs'
+import { SubsectionsMenu } from '~/components/investments/SubsectionsMenu'
 import { Button } from '~/components/ui/button'
 
 export const Route = createFileRoute('/app/$orgSlug/placements/')({
@@ -82,6 +83,7 @@ function Placements() {
               <Plus className="size-4" />
               {t('create.button')}
             </Button>
+            {org && <SubsectionsMenu orgId={org._id} />}
           </div>
         </div>
         <InvestmentsTabs

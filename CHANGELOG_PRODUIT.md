@@ -23,6 +23,35 @@ bas de page.
 
 ---
 
+## v1.244.1 — 18/09/2026 à 21:28 — Un seul ⋯ par page dans Investissements
+
+Le réglage des sous-sections rejoint le menu ⋯ **en haut de la page**, sur la
+ligne du titre. Posé à droite de la barre d'onglets, il tombait juste sous le
+⋯ des actions de la page sur Entreprises : deux menus identiques empilés dans
+le même coin, sans rien pour dire lequel fait quoi.
+
+Sur **Entreprises**, les trois sous-sections s'ajoutent donc au menu qui
+porte déjà Créer et les exports, sous un séparateur. Sur **Placements** et
+**Immobilier**, dont la ligne de titre n'avait pas de menu, un ⋯ apparaît à
+droite des boutons. Dans les deux cas : un seul ⋯ par page, et plus rien sous
+les onglets.
+
+> **🔧 Notes techniques**
+>
+> - `SubsectionsMenu.tsx` se scinde : `SubsectionsItems` (label + trois
+>   `DropdownMenuCheckboxItem`, à déposer dans n'importe quel
+>   `DropdownMenuContent`) et `SubsectionsMenu` (le même contenu derrière son
+>   propre déclencheur ⋯, pour les pages sans menu).
+> - `InvestmentsTabs` perd son déclencheur et son `ml-auto` ; la barre
+>   d'onglets redevient la seule liste.
+> - `participations.index.tsx` insère `SubsectionsItems` dans son menu
+>   existant ; `placements.index.tsx` et `immobilier.index.tsx` posent
+>   `SubsectionsMenu` dans le cluster de droite de leur ligne de titre
+>   (Immobilier gagne un `flex` autour de son bouton unique).
+> - Le composant lit `api.modules.list` lui-même plutôt que de recevoir
+>   l'état en prop : Convex partage une souscription par (query, args), donc
+>   c'est la même lecture que celle de la barre d'onglets.
+
 ## v1.244.0 — 18/09/2026 à 18:47 — La plateforme ne s'active plus, les sous-sections se décochent
 
 **Les quatre entrées de la barre latérale sont désormais toujours là** : À
