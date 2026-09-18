@@ -405,3 +405,130 @@ describe('backfill — repli non dilué et roundType', () => {
     expect(row?.flags).toEqual(['hors_enum:pre-série A bis'])
   })
 })
+
+/**
+ * ACT Running: the entry round (September 2025, 313 shares at 80 €) and,
+ * three months later, the next round's paperwork at the SAME price. A rank-1
+ * PV describing the later round used to outrank the entry bulletin and
+ * propose the next round's pre/post-money over the entry ones.
+ */
+const ACT_COMPANY_ID = 'jx7dazc018z5t2g9pf75my07k987rbt1'
+const ACT_DEAL_ID = 'k57654ar7h4k6tp94gt0seedk187rty6'
+
+/** Bulletin de souscription of the entry round — rank 2, dated 2025-09-03. */
+const actBulletin = (): DocExtraction => {
+  const d = emptyDoc(
+    'doc_act_bulletin',
+    'ACT - 2025.09.03 - Bulletin souscription Albo Club',
+    'subscription',
+  )
+  d.documentPeriod = '2025-09-03'
+  d.company.issuedShares = cited(37500, 'capital porté à 37 500 actions')
+  d.deal.sharesAcquired = cited(313, 'souscrit 313 actions')
+  d.deal.pricePerShareEur = cited(80, 'au prix unitaire de 80 euros')
+  d.deal.roundSizeEur = cited(143920, 'soit un montant total de 143 920 euros')
+  return d
+}
+
+/** Rapport du Président of the NEXT round — rank 1, dated 2025-12-10. */
+const actRapportDecembre = (): DocExtraction => {
+  const d = emptyDoc(
+    'doc_act_rapport',
+    'ACT - 2025.12.10 - Rapport President',
+    'legal',
+  )
+  d.documentPeriod = '2025-12-10'
+  d.company.issuedShares = cited(
+    40000,
+    'pour le porter ainsi à 40.000 euros, par l’émission d’un nombre maximum de 2.500 actions',
+  )
+  d.company.fullyDilutedShares = cited(40000, 'Total 40,000 100.00%')
+  d.deal.pricePerShareEur = cited(
+    80,
+    'moyennant un prix d’émission unitaire de 80 euros',
+  )
+  d.deal.roundSizeEur = cited(
+    200000,
+    'un prix de souscription total d’un montant maximum de 200.000 euros',
+  )
+  return d
+}
+
+/** The base as filled by the instrument import: the entry round, complete. */
+// `null` = a deal without any date (a default parameter would swallow `undefined`).
+const currentAct = (closingDate: string | null = '2025-09-05') => {
+  const current = currentAuxicare()
+  current.company.siren = '953877495'
+  current.company.totalShares = 37500
+  current.deal.sharesAcquired = 313
+  current.deal.pricePerShare = 8000
+  current.deal.roundSize = 14392000
+  current.deal.preMoneyValuation = 285608000
+  current.deal.postMoneyValuation = 300000000
+  current.deal.closingDate = closingDate ?? undefined
+  current.deal.signedDate = undefined
+  return current
+}
+
+const planAct = (
+  extractions = [actBulletin(), actRapportDecembre()],
+  current = currentAct(),
+) =>
+  planDeal({
+    companyId: ACT_COMPANY_ID,
+    companyName: 'ACT Running',
+    dealId: ACT_DEAL_ID,
+    dealLabel: 'Act Running - Seed',
+    current,
+    extractions,
+  })
+
+describe('backfill ACT Running — un document du tour suivant', () => {
+  it('écarte le document postérieur au closing et le dit dans le rapport', () => {
+    const plan = planAct()
+    const skipped = plan.rows.filter(
+      (r) => r.section === 'NON_TRAITE' && r.field === '*',
+    )
+    expect(skipped.map((r) => [r.docId, r.flags])).toEqual([
+      ['doc_act_rapport', ['document_posterieur_au_deal']],
+    ])
+  })
+
+  it("ne propose plus la valorisation du tour suivant sur le deal d'entrée", () => {
+    const plan = planAct()
+    const ecarts = plan.rows
+      .filter((r) => r.section === 'ECART')
+      .map((r) => [r.entityType, r.field])
+    expect(ecarts).toEqual([])
+    // Without the later PV there is no FD base, so the valuations are simply
+    // not treated — never overwritten with the next round's figures.
+    expect(find(plan, 'deal', 'postMoneyValuation')?.section).toBe('NON_TRAITE')
+    expect(find(plan, 'deal', 'preMoneyValuation')?.section).toBe('NON_TRAITE')
+    expect(plan.confirmed).toEqual(
+      expect.arrayContaining([
+        'company.totalShares',
+        'deal.sharesAcquired',
+        'deal.pricePerShare',
+        'deal.roundSize',
+      ]),
+    )
+  })
+
+  it('sans date sur le deal, rien ne filtre : comportement inchangé', () => {
+    const plan = planAct(undefined, currentAct(null))
+    expect(find(plan, 'deal', 'postMoneyValuation')?.section).toBe('ECART')
+    expect(find(plan, 'deal', 'postMoneyValuation')?.proposedValue).toBe(
+      '320000000',
+    )
+    expect(find(plan, 'company', 'totalShares')?.proposedValue).toBe('40000')
+  })
+
+  it('un PV daté quelques semaines après le closing reste une source', () => {
+    const pvProche = actRapportDecembre()
+    pvProche.documentPeriod = '2025-10-20'
+    const plan = planAct([actBulletin(), pvProche])
+    expect(
+      plan.rows.some((r) => r.flags.includes('document_posterieur_au_deal')),
+    ).toBe(false)
+  })
+})

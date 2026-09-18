@@ -46,6 +46,29 @@ export const SOURCE_RANK: Record<string, number | undefined> = {
 
 const TERM_SHEET_RANK = 4
 
+/**
+ * A document dated after the deal's closing (plus this margin) describes a
+ * LATER operation — the next round, a BSA exercise — not the round Albo
+ * entered on. Its share counts and prices are all correct, and all wrong
+ * for this deal: on ACT Running the December 2025 « Rapport du Président »
+ * (rank 1) outranked the September bulletin and proposed the next round's
+ * pre/post-money over the entry ones. The margin covers a PV constating the
+ * increase a few weeks after the closing date carried by the deal.
+ */
+export const LATER_DOCUMENT_TOLERANCE_DAYS = 60
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** True when the document is dated after `anchorIso` + tolerance. */
+function isLaterThanDeal(e: DocExtraction, anchorIso: string): boolean {
+  const period = e.documentPeriod
+  if (!period || !ISO_DATE.test(period)) return false
+  return (
+    isoToMs(period) >
+    isoToMs(anchorIso) + LATER_DOCUMENT_TOLERANCE_DAYS * DAY_MS
+  )
+}
+
 /** A value the model read, with the verbatim excerpt that justifies it. */
 export interface Cited<T> {
   value: T
@@ -58,6 +81,13 @@ export interface DocExtraction {
   documentTitle: string
   /** `documents.kind` */
   documentKind: string
+  /**
+   * `documents.period` as ISO `YYYY-MM-DD` — the document's own date (a PV,
+   * a bulletin). `null` or absent when the row has none. It is what tells a
+   * later round's paperwork apart from the entry round's (see
+   * `LATER_DOCUMENT_TOLERANCE_DAYS`).
+   */
+  documentPeriod?: string | null
   company: {
     legalName: Cited<string> | null
     legalForm: Cited<string> | null
@@ -346,9 +376,24 @@ export function planDeal(input: PlanInput): Plan {
     current,
   )
 
-  const usable = extractions.filter(
-    (e) => SOURCE_RANK[e.documentKind] !== undefined,
+  // The deal's own date, ISO like everything in `current`: the closing (PV)
+  // when known, else the bulletin signature. Without either, no document can
+  // be told "later" and the whole set is kept.
+  const anchor = [current.deal.closingDate, current.deal.signedDate].find(
+    (d): d is string => typeof d === 'string' && ISO_DATE.test(d),
   )
+  const usable: Array<DocExtraction> = []
+  for (const e of extractions) {
+    if (SOURCE_RANK[e.documentKind] === undefined) continue
+    if (anchor !== undefined && isLaterThanDeal(e, anchor)) {
+      b.skip('deal', '*', 'document_posterieur_au_deal', {
+        docId: e.documentId,
+        docTitle: e.documentTitle,
+      })
+      continue
+    }
+    usable.push(e)
+  }
   if (usable.length === 0) {
     b.skip('company', '*', 'aucun_document_source')
     return { rows: b.rows, confirmed: b.confirmed }

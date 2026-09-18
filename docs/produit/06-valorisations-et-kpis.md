@@ -17,9 +17,9 @@ portefeuille :
 Chaque deal porte un historique de valorisations : une date, une juste
 valeur, une méthode (dernier tour, mark-to-market…), une source et des notes.
 La **dernière valorisation connue** d'un deal alimente la NAV et le TVPI du
-portefeuille. La saisie se fait depuis la fiche deal ou via
-l'[assistant IA](11-assistant-ia.md) (« enregistre une valo de X à telle
-date »).
+portefeuille. La saisie se fait depuis la fiche d'un fonds ou d'un
+placement, ou via l'[assistant IA](11-assistant-ia.md) (« enregistre une
+valo de X à telle date »).
 
 ## KPIs
 
