@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.244.0 — 18/09/2026 à 18:44 — La plateforme ne s'active plus, les sous-sections se décochent
+## v1.244.0 — 18/09/2026 à 18:47 — La plateforme ne s'active plus, les sous-sections se décochent
 
 **Les quatre entrées de la barre latérale sont désormais toujours là** : À
 faire, Investissements, Trésorerie, Passif, que l'organisation s'en serve ou
@@ -83,6 +83,26 @@ atterrit sur Immobilier, et plus sur une page qu'elle avait masquée.
 >   réécrits sur les nouvelles règles (repli, les deux motifs de refus, la
 >   réversibilité, les slugs de plateforme refusés). `TESTING.md` : table MO
 >   refaite (MO1–MO10).
+## v1.243.2 — 18/09/2026 à 18:55 — Ménage : quatre tables inertes ont quitté la base
+
+Les quatre dernières tables héritées de fonctionnalités retirées (connexion
+Gmail, adresses d'envoi secondaires, anciennes connexions Vasco) ont été
+vidées (7 lignes) puis supprimées. Rien ne change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : retrait de `userEmailAliases`, `gmailAccounts`,
+>   `gmailOAuthStates` et `vascoConnections`, vidées en prod le 18/09/2026
+>   (`MIGRATIONS.md` « Purge des tables inertes »). Reste déclarée : la
+>   table legacy `forecasts`, encore écrite par l'import Airtable.
+> - Supprimés avec les tables : `convex/migrations/purgeInertTables.ts` et
+>   son test, et le one-shot `convex/migrations/externalConnections.ts`
+>   (`migrateVascoConnections`, exécuté, lisait `vascoConnections`) —
+>   `convex/_generated/api.d.ts` régénéré en conséquence.
+>   `purgeStrayOrgs.CONTENT_TABLES` ne cite plus la table.
+> - Docs : `MIGRATIONS.md` (ligne passée en « fait », chantier
+>   `vascoConnections` clos), `KNOWN_ISSUES.md` (sections Gmail, alias,
+>   VASCO API).
 
 ## v1.243.1 — 18/09/2026 à 18:40 — Ménage : vider quatre tables inertes
 

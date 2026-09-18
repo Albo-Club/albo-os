@@ -607,29 +607,6 @@ export default defineSchema({
     notifyWeeklyReports: v.optional(v.boolean()),
   }).index('by_user', ['userId']),
 
-  /**
-   * INERT — declared, written by nothing, read by nothing.
-   *
-   * Held the secondary addresses a member forwarded reports from. Retired in
-   * 09/2026: every address anyone forwards from is a member account of theirs,
-   * so `resolveMemberByEmail` finds them on `users.email` alone, and
-   * `addMemberAlias` refused an address that was already an account anyway —
-   * the table could not hold the very addresses it was built for.
-   *
-   * Kept declared rather than dropped, same stance as the legacy `forecasts`
-   * and the inert Gmail tables: removing it means purging prod first, then
-   * narrowing. Cf. `KNOWN_ISSUES.md` § « Adresses d'envoi des reports ».
-   */
-  userEmailAliases: defineTable({
-    userId: v.id('users'),
-    /** Lowercased, like `users.email` and the normalized `fromEmail`. */
-    email: v.string(),
-    addedBy: v.id('users'),
-    addedAt: v.number(),
-  })
-    .index('by_email', ['email'])
-    .index('by_user', ['userId']),
-
   organizations: defineTable({
     slug: v.string(),
     name: v.string(),
@@ -750,50 +727,6 @@ export default defineSchema({
     .index('by_link_code', ['linkCode']),
 
   /**
-   * gmailAccounts — LEGACY, declared but inert. Belonged to the retired
-   * emails feature (Gmail-synced portfolio email timeline); the whole
-   * browsing/sync surface was removed to be rethought later. Kept declared
-   * with its data until the purge-then-narrow cleanup (same convention as
-   * the legacy `forecasts` table). Read by nothing.
-   * `refreshToken` remains secret at rest — never expose rows publicly.
-   */
-  gmailAccounts: defineTable({
-    orgId: v.optional(v.id('organizations')), // org fed by this mailbox
-    userId: v.id('users'), // who connected the mailbox
-    email: v.string(), // mailbox address, lowercase — upsert key with orgId
-    refreshToken: v.string(), // OAuth refresh token — secret
-    historyId: v.optional(v.string()), // incremental sync cursor
-    status: v.union(
-      v.literal('connected'),
-      v.literal('reauth_required'),
-      v.literal('error'),
-    ),
-    lastError: v.optional(v.string()),
-    lastSyncAt: v.optional(v.number()),
-    // Anti-spam guard of the reauth alert email: set when the alert for the
-    // current incident went out, cleared on reconnect (cf. Powens
-    // `notifiedHealth`, same convention).
-    reauthNotifiedAt: v.optional(v.number()),
-    createdAt: v.number(),
-  })
-    .index('by_org', ['orgId'])
-    .index('by_org_and_email', ['orgId', 'email'])
-    .index('by_user', ['userId']),
-
-  /**
-   * gmailOAuthStates — LEGACY, declared but inert (retired emails feature,
-   * same convention as `gmailAccounts`). Short-lived anti-CSRF tokens of the
-   * removed Gmail OAuth flow. Read by nothing.
-   */
-  gmailOAuthStates: defineTable({
-    orgId: v.optional(v.id('organizations')),
-    userId: v.id('users'),
-    state: v.string(),
-    returnTo: v.string(), // in-app path to land back on after the callback
-    createdAt: v.number(),
-  }).index('by_state', ['state']),
-
-  /**
    * externalConnections — org-scoped connections to external platforms whose
    * auth kind is `credentials` (cf. `convex/lib/connectors.ts`, the registry).
    * Generic storage managed by the common core `convex/connections.ts`;
@@ -826,28 +759,6 @@ export default defineSchema({
     .index('by_org', ['orgId'])
     .index('by_org_and_platform', ['orgId', 'platform'])
     .index('by_platform', ['platform']),
-
-  /**
-   * vascoConnections — LEGACY, declared but inert. Superseded by
-   * `externalConnections` (platform 'vasco') via the one-shot
-   * `migrations/externalConnections:migrateVascoConnections` — cf.
-   * `MIGRATIONS.md`. Kept declared until the purge-then-narrow cleanup
-   * (same convention as the legacy `forecasts` table). Read by nothing.
-   */
-  vascoConnections: defineTable({
-    orgId: v.id('organizations'), // Albo OS org fed by this connection
-    clientSlug: v.string(), // → https://api.<clientSlug>.vasco.fund
-    label: v.string(), // human label, e.g. "Parallel — Calte"
-    username: v.string(), // login email — secret
-    password: v.string(), // login password — secret at rest
-    active: v.boolean(),
-    createdAt: v.number(),
-    createdBy: v.optional(v.id('users')),
-    lastConnectedAt: v.optional(v.number()),
-    lastError: v.optional(v.string()),
-  })
-    .index('by_org', ['orgId'])
-    .index('by_client_and_username', ['clientSlug', 'username']),
 
   /**
    * vascoCommunicationsCache — local copy of the investor communications pulled
