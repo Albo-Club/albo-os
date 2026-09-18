@@ -28,7 +28,7 @@
       "default": "Could not save"
     },
     "reportSilence": "Reporting alert (months)",
-    "reportSilenceHint": "Months without a received report past which a participation is flagged as silent, in the participations list and the To do tab. Companies that never reported are counted from the day the funds were wired."
+    "reportSilenceHint": "Months without a received report past which a participation is flagged as silent, in the participations list and the To do tab. A company that never gave any news is flagged right away, whatever the delay."
   },
   "members": {
     "title": "Members",

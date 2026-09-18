@@ -50,8 +50,11 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
   rien, il publie, et l'alerte doit lire là où il parle. Le survol donne le
   détail : par quel canal la dernière nouvelle est arrivée, depuis quand, et
   jusqu'à quelle période elle couvrait — un rapport reçu en mars peut ne
-  couvrir que janvier. Une société qui n'a jamais donné de nouvelles est
-  comptée depuis le versement des fonds. Les term sheets en cours et les positions sorties
+  couvrir que janvier. Une société qui n'a **jamais** donné de nouvelles
+  porte la pastille **d'emblée**, quel que soit le délai : une participation
+  doit avoir son état des lieux de départ dès l'entrée, et le survol le dit
+  (« Aucun report reçu — un état des lieux de départ manque », avec la date
+  du versement des fonds). Les term sheets en cours et les positions sorties
   ne portent jamais cette pastille. Le même signal alimente le bloc
   « Reportings manquants » de la page [À faire](16-a-faire.md).
 - **Colonnes alignées d'un tableau à l'autre** : les quatre tableaux

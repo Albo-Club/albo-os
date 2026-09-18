@@ -14,11 +14,13 @@
  * covers — a quarterly reporter would otherwise look silent the day after
  * reporting.
  *
- * A company that never reported is measured from its FIRST DISBURSEMENT
- * instead: funds wired two weeks ago do not owe a report yet. That date is
- * the earliest outflow reconciled on one of its live deals, falling back to
- * the deal's signature date when nothing is reconciled (old imported deals
- * would never be evaluable otherwise).
+ * A company that never gave news is flagged RIGHT AWAY, whatever the
+ * threshold: a position should carry a baseline report from day one, so the
+ * absence is an alert in itself, not a silence to wait out. Its `sinceAt` is
+ * the first disbursement — the earliest outflow reconciled on one of its
+ * live deals, falling back to the deal's signature date when nothing is
+ * reconciled (old imported deals would have no date otherwise) — which the
+ * UI shows and the sort uses.
  *
  * Scope: non-archived portfolio companies target of at least one live deal —
  * an exited position would nag forever.
@@ -49,7 +51,7 @@ export type SilentCompany = {
   lastNewsSource: NewsSource | null
   /** Most recent period covered by a report, null when unknown. */
   coverageUntil: number | null
-  /** What the silence is counted from: last news, else first disbursement. */
+  /** Reception of the last news, else the first disbursement. */
   sinceAt: number
 }
 
@@ -162,12 +164,12 @@ async function firstOutflowAt(
 }
 
 /**
- * The org's silent companies, longest silence first. Reads the org's live
- * deals, its portfolio companies and its portal communications; the reports
- * themselves are NEVER read here — their two dates are denormalized on the
- * company row (cf. `recordReportOnCompany`). The transactions are only read
- * for companies that never gave news (the sole case where the disbursement
- * date is needed).
+ * The org's silent companies, longest silence first: past the threshold, or
+ * without any news at all. Reads the org's live deals, its portfolio
+ * companies and its portal communications; the reports themselves are NEVER
+ * read here — their two dates are denormalized on the company row (cf.
+ * `recordReportOnCompany`). The transactions are only read for companies
+ * that never gave news (the sole case where the disbursement date is needed).
  */
 export async function listSilentCompanies(
   ctx: Ctx,
@@ -262,9 +264,11 @@ export async function listSilentCompanies(
 
     let sinceAt: number
     if (lastNewsAt !== null) {
+      if (lastNewsAt > cutoff) continue
       sinceAt = lastNewsAt
     } else {
-      // Never gave news: count from the first disbursement.
+      // Never gave news: flagged whatever the threshold (cf. header), dated
+      // from the first disbursement.
       let firstPaid: number | null = null
       for (const dealId of deals) {
         const paidAt = await firstOutflowAt(ctx, dealId)
@@ -275,7 +279,6 @@ export async function listSilentCompanies(
       sinceAt = firstPaid ?? signedByCompany.get(company._id) ?? now
     }
 
-    if (sinceAt > cutoff) continue
     silent.push({
       companyId: company._id,
       companyName: company.name,

@@ -63,7 +63,8 @@ La page empile huit blocs :
    rien à renouveler. Chaque ligne renvoie vers les [placements](19-placements.md).
 9. **Reportings manquants** — les participations dont aucun rapport n'est
    arrivé depuis plus de **4 mois** (délai réglable par organisation dans
-   Réglages → Général). Chaque ligne renvoie vers la fiche de la société.
+   Réglages → Général), et celles qui n'en ont **jamais** reçu aucun. Chaque
+   ligne renvoie vers la fiche de la société.
 
 Tous les blocs sauf les tâches sont **automatiques** : un item disparaît de
 lui-même dès que l'action est faite (transaction pointée, banque
@@ -84,10 +85,12 @@ l'ouverture de la page.
   ces sociétés n'envoient jamais de mail, elles publient. Encore faut-il que
   l'entité soit **reliée à son émetteur** dans ses Intégrations — sans ce
   lien, ses publications restent invisibles et l'alerte se déclenche à tort.
-- Une société qui **n'a jamais** donné de nouvelles est comptée depuis le
-  **versement des fonds** (le premier décaissement pointé en banque, à
-  défaut la date de signature du deal) : des fonds versés il y a deux
-  semaines ne doivent encore rien.
+- Une société qui **n'a jamais** donné de nouvelles apparaît **d'emblée**,
+  sans attendre le délai : une participation doit avoir son état des lieux
+  de départ dès l'entrée. La ligne le dit (« Aucun report reçu — un état des
+  lieux de départ manque ») avec la date du **versement des fonds** (le
+  premier décaissement pointé en banque, à défaut la date de signature du
+  deal), qui sert aussi au classement.
 - Le même signal apparaît dans la liste des participations, sous forme de
   pastille d'alerte à côté du nom de la société.
 - Les tâches manuelles sont partagées entre les membres de l'organisation
