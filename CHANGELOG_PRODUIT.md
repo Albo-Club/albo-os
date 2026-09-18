@@ -23,6 +23,32 @@ bas de page.
 
 ---
 
+## v1.237.1 — 18/09/2026 à 11:00 — Ménage : l'ancienne copie du texte des documents
+
+Outil interne, rien de visible dans l'app. Chaque fiche document traînait
+encore une vieille copie de son texte extrait, écrite par un ancien système,
+que plus rien ne lit mais que chaque ouverture de fiche société chargeait
+quand même. Une opération à lancer une fois vide ces copies, en gardant le
+texte là où il sert (et en évitant de repayer une lecture OCR pour les
+documents dont c'était la seule copie).
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/legacyExtractedText.ts` : `scanPage` (pagination de
+>   `documents` bornée à 4 Mio par `maximumBytesRead`, renvoie les lignes
+>   portant `extractedText` et leur taille) et `migrateBatch` (par document :
+>   `documentTexts` existant → on efface juste le champ ; sinon on y copie le
+>   texte via `boundText`, `ocrState: 'extracted'`, `ocrChars`, `vectorState`
+>   remis à `undefined` pour que `backfillAll` indexe). Idempotent.
+> - `scripts/legacy-extracted-text.mjs` : à blanc par défaut, `--apply`
+>   migre par lots de 4 (une ligne + son `documentTexts` ≈ jusqu'à 1 Mio
+>   chacun, limite mutation 16 Mio). Fonctions feuilles, pas d'auto-référence
+>   `internal.*`.
+> - `convex/regression.legacyExtractedText.test.ts` (6 cas, via `anyApi`).
+> - Runbook : ligne dans `MIGRATIONS.md` + chantier « retrait du champ
+>   legacy » mis à jour. Le retrait du champ dans le schéma reste une PR de
+>   suivi, une fois la prod à zéro.
+
 ## v1.237.0 — 17/09/2026 à 19:00 — Un mail d'inconnu en quarantaine vous prévient
 
 Un mail envoyé à l'adresse de report par quelqu'un qui n'est pas membre, et
