@@ -42,9 +42,9 @@
     "title": "Missing reportings",
     "empty": "Every participation gave news recently.",
     "lastReport": "No news since {{date}}",
-    "neverReported": "No news since the funds were wired on {{date}}",
-    "hint_one": "Participations with no report or communication for over {{count}} month (threshold set in Settings → General).",
-    "hint_other": "Participations with no report or communication for over {{count}} months (threshold set in Settings → General)."
+    "neverReported": "No report received — a baseline report is missing (funds wired on {{date}})",
+    "hint_one": "Participations with no report or communication for over {{count}} month (threshold set in Settings → General), and those that never received any.",
+    "hint_other": "Participations with no report or communication for over {{count}} months (threshold set in Settings → General), and those that never received any."
   },
   "overdueInstalments": {
     "title": "Loan instalments to match",

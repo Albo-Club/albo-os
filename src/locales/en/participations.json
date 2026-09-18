@@ -884,7 +884,7 @@
     "lastReport_other": "Last report received {{count}} months ago",
     "lastComm_one": "Last communication {{count}} month ago",
     "lastComm_other": "Last communication {{count}} months ago",
-    "never": "No news since the funds were wired on {{date}}",
+    "never": "No report received — a baseline report is missing (funds wired on {{date}})",
     "coverage": "Covered through {{date}}"
   }
 }

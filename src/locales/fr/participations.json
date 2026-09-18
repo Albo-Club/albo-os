@@ -884,7 +884,7 @@
     "lastReport_other": "Dernier report reçu il y a {{count}} mois",
     "lastComm_one": "Dernière communication il y a {{count}} mois",
     "lastComm_other": "Dernière communication il y a {{count}} mois",
-    "never": "Aucune nouvelle depuis le versement des fonds du {{date}}",
+    "never": "Aucun report reçu — un état des lieux de départ manque (fonds versés le {{date}})",
     "coverage": "Couverture jusqu'au {{date}}"
   }
 }
