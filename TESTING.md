@@ -197,20 +197,23 @@ une entité `group_*` de l'org, `currentBalance` en cents) et quelques
 ## Niveau 3 — Modules activables (5 min)
 
 Un module s'affiche s'il **contient quelque chose** ou s'il a été **activé à
-la main** (SPEC D37). Vaut pour les entrées de barre latérale
-(Investissements, Trésorerie, Passif) **et** pour les trois sous-onglets
-d'Investissements. « À faire » et l'espace de travail ne se masquent jamais.
+la main** (SPEC D37). Ne vaut que pour les **trois sous-sections
+d'Investissements** : la barre latérale n'est plus modulaire (À faire,
+Investissements, Trésorerie, Passif y sont toujours), et l'espace de travail
+non plus.
 
 | #   | Étape | Résultat attendu |
 | --- | ----- | ---------------- |
-| MO1 | Ouvrir une org neuve (aucun compte, aucun deal, aucun bien) | La barre latérale ne montre que **À faire** et l'espace de travail ; Investissements / Trésorerie / Passif sont masqués. Un bouton **« Activer un module »** apparaît en bas du groupe principal |
-| MO2 | « Activer un module » → Trésorerie | L'entrée apparaît immédiatement et **reste** visible bien que vide ; c'est là que le premier compte se crée. Toast de confirmation |
-| MO3 | Créer un bien dans une org où Immobilier était masqué | Immobilier **et** Investissements apparaissent sans rien déclarer ; les onglets Entreprises et Placements restent masqués s'ils sont vides |
-| MO4 | ⋯ à côté des sous-onglets d'Investissements | Liste **uniquement** les sous-onglets masqués ; un onglet déjà visible n'y figure jamais. Le ⋯ disparaît quand les trois sont visibles |
-| MO5 | Être sur `/immobilier` puis supprimer le dernier bien | L'onglet **Immobilier reste visible** tant qu'on est dessus — jamais de trappe. Il disparaît en changeant de page (sauf s'il a été activé à la main) |
-| MO6 | Org contenant des comptes bancaires, désactiver Trésorerie via l'API | Le module **reste affiché** : le contenu l'emporte sur l'extinction, des lignes existantes ne doivent pas devenir inaccessibles |
-| MO7 | Rechargement de page | Pas de clignotement : pendant le chargement de la query, **tout** est affiché, puis la liste se resserre — jamais l'inverse |
-| MO8 | i18n EN/FR | Bouton « Activer un module » / « Activate a module » et les noms de modules traduits |
+| MO1 | Ouvrir une org neuve (aucun compte, aucun deal, aucun bien) | La barre latérale montre les **quatre** entrées de la plateforme (À faire, Investissements, Trésorerie, Passif) plus l'espace de travail — **aucun** bouton « Activer un module ». Investissements ouvre **Entreprises** seule ; Placements et Immobilier sont masqués |
+| MO2 | ⋯ tout à **droite** de la barre d'onglets d'Investissements | Un menu « Sous-sections » listant **les trois**, cochées ou non — pas seulement les masquées, et l'onglet ouvert y figure comme les autres (plus de doublon avec l'onglet actif). Le ⋯ ne disparaît jamais |
+| MO3 | Cocher Immobilier, puis le décocher | Coché : l'onglet apparaît immédiatement et **reste** visible bien que vide (c'est là que le premier bien se crée), toast « Immobilier affiché. ». Décoché : l'onglet repart, toast « Immobilier masqué. ». Le menu **reste ouvert** entre deux clics |
+| MO4 | Décocher une sous-section qui **contient** des lignes (Entreprises sur une org avec une participation) | Ligne **désactivée**, avec la mention « contient des données » à droite : le contenu l'emporte, des lignes existantes ne doivent pas devenir inaccessibles |
+| MO5 | Décocher la **dernière** sous-section affichée | Ligne **désactivée**, mention « la dernière » : Investissements doit garder une page à ouvrir |
+| MO6 | Créer un bien dans une org où Immobilier était masqué | L'onglet Immobilier apparaît sans rien déclarer, et sa ligne du menu passe en « contient des données ». La barre latérale, elle, ne bouge pas |
+| MO7 | Org qui ne détient **que** de l'immobilier (Immobilier coché, Entreprises et Placements vides et décochés) : cliquer **Investissements** dans la barre latérale | Atterrit sur `/immobilier`, pas sur `/participations` — une org ne doit pas tomber sur une page qu'elle a masquée. L'entrée reste surlignée sur les trois sous-pages |
+| MO8 | Être sur `/immobilier` puis supprimer le dernier bien | L'onglet **Immobilier reste visible** tant qu'on est dessus — jamais de trappe. Il disparaît en changeant de page (sauf s'il est coché) |
+| MO9 | Rechargement de page | Pas de clignotement : pendant le chargement de la query, **tout** est affiché, puis la liste se resserre — jamais l'inverse. Les lignes du menu sont désactivées le temps du chargement |
+| MO10 | i18n EN/FR | Libellé « Sous-sections » / « Sub-sections », motifs « contient des données » / « holds data » et « la dernière » / « the last one », toasts affiché/masqué traduits. Les noms des trois sous-sections viennent du titre de leur page |
 
 ## Niveau 3 — Onglet Immobilier (7 min)
 

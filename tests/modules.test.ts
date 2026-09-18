@@ -1,5 +1,5 @@
 /**
- * Pure tests for the activatable-module rule (convex/lib/modules.ts).
+ * Pure tests for the sub-section rule (convex/lib/modules.ts).
  *
  * Run with Node's native test runner via tsx (no dependency):
  *   pnpm test:unit
@@ -12,9 +12,8 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
   ALL_MODULES,
-  SIDEBAR_MODULES,
-  TAB_MODULES,
-  activatableModules,
+  FALLBACK_MODULE,
+  hideBlockedBy,
   isModuleKey,
   isVisible,
   visibleModules,
@@ -26,100 +25,125 @@ const state = (
   over: Partial<ModuleState> = {},
 ): ModuleState => ({ key, hasContent: false, enabled: false, ...over })
 
-describe('visibilité d’un module (D37)', () => {
-  it('un module qui contient quelque chose est visible', () => {
-    assert.equal(isVisible(state('cash', { hasContent: true })), true)
+describe('visibilité d’une sous-section (D37)', () => {
+  it('une sous-section qui contient quelque chose est visible', () => {
+    assert.equal(isVisible(state('placements', { hasContent: true })), true)
   })
 
-  it('un module vide mais activé à la main est visible', () => {
-    assert.equal(isVisible(state('cash', { enabled: true })), true)
+  it('une sous-section vide mais cochée à la main est visible', () => {
+    assert.equal(isVisible(state('placements', { enabled: true })), true)
   })
 
-  it('un module vide et non activé est masqué', () => {
-    assert.equal(isVisible(state('cash')), false)
+  it('une sous-section vide et non cochée est masquée', () => {
+    assert.equal(isVisible(state('placements')), false)
   })
 
-  it('le contenu gagne sur la désactivation', () => {
-    // Éteindre un module qui contient des lignes ne les rend pas
+  it('le contenu gagne sur le décochage', () => {
+    // Décocher une sous-section qui contient des lignes ne les rend pas
     // inaccessibles : sinon elles seraient invisibles sans retour possible.
     assert.equal(
-      isVisible(state('passif', { hasContent: true, enabled: false })),
+      isVisible(state('immobilier', { hasContent: true, enabled: false })),
       true,
     )
   })
 })
 
-describe('ce que la barre latérale et les onglets affichent', () => {
-  it('ne garde que les modules visibles, dans l’ordre de déclaration', () => {
+describe('ce que la barre d’onglets affiche', () => {
+  it('ne garde que les sous-sections visibles, dans l’ordre de déclaration', () => {
     const states = [
-      state('investments', { hasContent: true }),
-      state('cash'),
-      state('passif', { enabled: true }),
+      state('entreprises', { hasContent: true }),
+      state('placements'),
+      state('immobilier', { enabled: true }),
     ]
-    assert.deepEqual(visibleModules(states, SIDEBAR_MODULES), [
-      'investments',
-      'passif',
-    ])
+    assert.deepEqual(visibleModules(states), ['entreprises', 'immobilier'])
   })
 
-  it('un module inconnu de l’état est affiché — jamais masqué par ignorance', () => {
-    assert.deepEqual(visibleModules([], SIDEBAR_MODULES), [...SIDEBAR_MODULES])
+  it('une sous-section inconnue de l’état est affichée — jamais masquée par ignorance', () => {
+    assert.deepEqual(visibleModules([]), [...ALL_MODULES])
   })
 
-  it('une SCI sans participation ni placement ne voit ni l’un ni l’autre', () => {
+  it('une SCI sans participation ni placement ne voit que l’immobilier', () => {
     const states = [
       state('entreprises'),
       state('placements'),
       state('immobilier', { hasContent: true }),
     ]
-    assert.deepEqual(visibleModules(states, TAB_MODULES), ['immobilier'])
+    assert.deepEqual(visibleModules(states), ['immobilier'])
+  })
+
+  it('une org qui n’a rien choisi voit Entreprises', () => {
+    // C'est le repli qui tient lieu de défaut : rien à écrire à la création
+    // d'une org, et une org vide existante n'arrive pas sur une section sans
+    // aucune page.
+    const states = ALL_MODULES.map((key) => state(key))
+    assert.deepEqual(visibleModules(states), [FALLBACK_MODULE])
   })
 })
 
-describe('ce que le menu ⋯ propose', () => {
-  it('propose exactement les modules masqués', () => {
-    const states = [
-      state('entreprises'),
-      state('placements'),
-      state('immobilier', { hasContent: true }),
-    ]
-    assert.deepEqual(activatableModules(states, TAB_MODULES), [
-      'entreprises',
-      'placements',
-    ])
-  })
-
-  it('ne propose jamais un module déjà visible', () => {
+describe('ce que le menu ⋯ refuse de masquer', () => {
+  it('refuse de masquer une sous-section qui contient des lignes', () => {
     const states = [
       state('entreprises', { hasContent: true }),
       state('placements', { enabled: true }),
-      state('immobilier', { hasContent: true }),
+      state('immobilier'),
     ]
-    assert.deepEqual(activatableModules(states, TAB_MODULES), [])
+    assert.equal(hideBlockedBy(states, 'entreprises'), 'content')
   })
 
-  it('rend une liste vide quand l’état n’est pas encore chargé', () => {
-    // Rien à proposer tant qu'on ne sait pas : le menu ne s'affiche pas.
-    assert.deepEqual(activatableModules([], TAB_MODULES), [])
+  it('refuse de masquer la dernière visible', () => {
+    // Investissements doit garder une page ; sans ce garde-fou le repli
+    // ramènerait Entreprises, donc décocher la dernière ne ferait rien de
+    // visible — un clic sans effet.
+    const states = [
+      state('entreprises'),
+      state('placements', { enabled: true }),
+      state('immobilier'),
+    ]
+    assert.equal(hideBlockedBy(states, 'placements'), 'last')
+  })
+
+  it('laisse masquer une sous-section vide quand il en reste une autre', () => {
+    const states = [
+      state('entreprises', { hasContent: true }),
+      state('placements', { enabled: true }),
+      state('immobilier'),
+    ]
+    assert.equal(hideBlockedBy(states, 'placements'), null)
+  })
+
+  it('ne dit rien d’une sous-section déjà masquée', () => {
+    const states = [
+      state('entreprises', { hasContent: true }),
+      state('placements'),
+      state('immobilier'),
+    ]
+    assert.equal(hideBlockedBy(states, 'immobilier'), null)
   })
 })
 
-describe('le registre des modules', () => {
-  it('couvre la barre latérale et les onglets, sans doublon', () => {
-    assert.deepEqual(ALL_MODULES, [...SIDEBAR_MODULES, ...TAB_MODULES])
+describe('le registre des sous-sections', () => {
+  it('couvre les trois sous-sections d’Investissements, sans doublon', () => {
+    assert.deepEqual(ALL_MODULES, ['entreprises', 'placements', 'immobilier'])
     assert.equal(new Set(ALL_MODULES).size, ALL_MODULES.length)
   })
 
-  it('« À faire » n’est PAS un module activable', () => {
-    // Il porte les signaux de tous les autres : le masquer masquerait le
-    // moyen d'agir sur le reste.
+  it('la plateforme n’est plus modulaire', () => {
+    // Investissements, Trésorerie et Passif sont toujours dans la barre
+    // latérale : une entrée absente ne dit rien, une page vide dit ce
+    // qu'elle attend. Leurs anciens slugs ne sont plus des modules.
+    for (const legacy of ['investments', 'cash', 'passif']) {
+      assert.equal(isModuleKey(legacy), false)
+    }
+  })
+
+  it('« À faire » n’a jamais été un module', () => {
     assert.equal(isModuleKey('todo'), false)
     assert.equal(isModuleKey('settings'), false)
   })
 
   it('reconnaît les slugs connus et rejette le reste', () => {
     assert.equal(isModuleKey('immobilier'), true)
-    assert.equal(isModuleKey('passif'), true)
+    assert.equal(isModuleKey('entreprises'), true)
     assert.equal(isModuleKey('nimportequoi'), false)
   })
 })

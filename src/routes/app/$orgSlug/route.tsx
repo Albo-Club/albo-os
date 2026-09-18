@@ -155,7 +155,6 @@ function OrgLayout() {
           avatarUrl: me.user.avatarUrl,
           superAdmin: me.user.superAdmin,
         }}
-        orgId={org?._id}
         modules={modules}
       />
       <SidebarInset className="overflow-hidden">

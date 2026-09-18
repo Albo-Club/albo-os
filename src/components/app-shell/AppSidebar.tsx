@@ -1,13 +1,11 @@
 import { Link, useLocation } from '@tanstack/react-router'
 import { useTranslation } from 'react-i18next'
 
-import { SIDEBAR_MODULES, isVisible } from '../../../convex/lib/modules'
+import { visibleModules } from '../../../convex/lib/modules'
 import { OrgSwitcher } from './OrgSwitcher'
 import { NavUser } from './NavUser'
-import { getNavGroups } from './nav'
-import { ModuleActivator } from './ModuleActivator'
+import { SUBSECTION_ROUTES, getNavGroups } from './nav'
 import type { ModuleState } from '../../../convex/lib/modules'
-import type { Id } from '../../../convex/_generated/dataModel'
 import type { NavGroup } from './nav'
 import { Badge } from '~/components/ui/badge'
 import {
@@ -48,7 +46,6 @@ export function AppSidebar({
   myRole,
   me,
   navGroups,
-  orgId,
   modules,
 }: {
   orgs: Array<Org>
@@ -56,14 +53,23 @@ export function AppSidebar({
   myRole: string | undefined
   me: Me
   navGroups?: Array<NavGroup>
-  /** Absent in the cross-org view, which has no modules to activate. */
-  orgId?: Id<'organizations'>
+  /** Absent in the cross-org view, which has no sub-sections of its own. */
   modules?: Array<ModuleState>
 }) {
   const location = useLocation()
   const { t } = useTranslation(['nav', 'common'])
   const groups = navGroups ?? getNavGroups()
   const isAdmin = myRole === 'admin' || myRole === 'owner'
+
+  // « Investissements » opens the org's first visible sub-section. Entreprises
+  // is the fallback of `visibleModules`, so this only ever differs for an org
+  // that hid it — one holding buildings and no participation, say, which must
+  // not land on a page it took off its own screen.
+  const firstSubsection = modules ? visibleModules(modules)[0] : 'entreprises'
+  const withSubsectionTarget = (item: NavLeaf): NavLeaf =>
+    item.titleKey === 'items.investments'
+      ? { ...item, to: SUBSECTION_ROUTES[firstSubsection] }
+      : item
 
   const renderItem = (item: NavLeaf, size?: 'sm') => {
     const Icon = item.icon
@@ -136,28 +142,10 @@ export function AppSidebar({
       </SidebarHeader>
       <SidebarContent>
         {groups.map((group) => {
-          const visibleItems = group.items.filter((item) => {
-            if (item.adminOnly && !isAdmin) return false
-            // An entry with no module is always shown — « À faire » carries
-            // the signals of every other one, and the workspace entries are
-            // not modules (SPEC D37).
-            if (!item.module) return true
-            // While the query is in flight, show everything: a sidebar that
-            // flickers items away on load reads as data loss.
-            if (!modules) return true
-            const state = modules.find((row) => row.key === item.module)
-            return state ? isVisible(state) : true
-          })
-          const activator =
-            orgId && !group.secondary ? (
-              <ModuleActivator
-                orgId={orgId}
-                states={modules}
-                among={SIDEBAR_MODULES}
-                variant="sidebar"
-              />
-            ) : null
-          if (visibleItems.length === 0 && !activator) return null
+          const visibleItems = group.items.filter(
+            (item) => !item.adminOnly || isAdmin,
+          )
+          if (visibleItems.length === 0) return null
           return (
             <SidebarGroup
               key={group.labelKey}
@@ -169,9 +157,11 @@ export function AppSidebar({
               <SidebarGroupContent>
                 <SidebarMenu>
                   {visibleItems.map((item) =>
-                    renderItem(item, group.secondary ? 'sm' : undefined),
+                    renderItem(
+                      withSubsectionTarget(item),
+                      group.secondary ? 'sm' : undefined,
+                    ),
                   )}
-                  {activator}
                 </SidebarMenu>
               </SidebarGroupContent>
             </SidebarGroup>

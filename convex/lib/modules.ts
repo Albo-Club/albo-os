@@ -1,82 +1,89 @@
 /**
- * The activatable modules of an org (SPEC D37).
+ * Which sub-sections of Investissements an org shows (SPEC D37, revised).
  *
- * A module is displayed when it **holds something**, or when it has been
- * **turned on by hand**. Nothing else: there is no per-user preference and
- * no display cache — what is visible is derived on every read from the data
- * itself, so a module appears the moment its first row exists and never has
- * to be maintained.
+ * The platform itself is NOT modular any more: À faire, Investissements,
+ * Trésorerie and Passif are always in the sidebar, empty or not. An entry
+ * that is missing tells nothing; an empty page says what it is waiting for,
+ * and that is what a newcomer needs. Only Investissements has sub-sections,
+ * because that is the one place where orgs genuinely differ — an SCI holds a
+ * building and no participation, a holding is the other way round.
  *
- * The explicit activation is what makes the rule usable at all. Hiding an
- * empty module automatically would hide it exactly when it is needed — to
- * create its FIRST element. So the ⋯ menu can always bring one back.
+ * « Une sous-section s'affiche si elle contient quelque chose, ou si elle a
+ * été cochée à la main. » Nothing is cached: what each one holds is probed on
+ * every read, so it appears the moment its first row exists.
  *
- * Pure (no Convex import): the slugs and the ordering are shared by the
- * server query and the two front surfaces, and tested in node:test.
+ * Two rules keep the switch from trapping anyone, and they are what makes it
+ * REVERSIBLE — the defect of the first version, which could only ever add:
+ * a sub-section holding rows cannot be hidden (the content wins), and the
+ * last visible one cannot be hidden either (the section would have no page
+ * left). The second doubles as the default: an org that has never chosen
+ * anything shows Entreprises, with nothing to write at creation.
+ *
+ * Pure (no Convex import): the slugs and the rules are shared by the server
+ * query and the front, and tested in node:test.
  */
 
-/** Sidebar entries that can be hidden. */
-export const SIDEBAR_MODULES = ['investments', 'cash', 'passif'] as const
+/** Sub-sections of Investissements, in display order. */
+export const ALL_MODULES = ['entreprises', 'placements', 'immobilier'] as const
 
-/** Sub-tabs of the Investissements section. */
-export const TAB_MODULES = ['entreprises', 'placements', 'immobilier'] as const
+export type ModuleKey = (typeof ALL_MODULES)[number]
 
-export type SidebarModule = (typeof SIDEBAR_MODULES)[number]
-export type TabModule = (typeof TAB_MODULES)[number]
-export type ModuleKey = SidebarModule | TabModule
-
-export const ALL_MODULES: ReadonlyArray<ModuleKey> = [
-  ...SIDEBAR_MODULES,
-  ...TAB_MODULES,
-]
+/** The one shown when an org has never chosen — see the header. */
+export const FALLBACK_MODULE: ModuleKey = 'entreprises'
 
 export function isModuleKey(value: string): value is ModuleKey {
   return (ALL_MODULES as ReadonlyArray<string>).includes(value)
 }
 
-/**
- * ⚠️ « À faire » is deliberately NOT in the list, and neither are the
- * workspace entries.
- *
- * The To do tab is where the signals of every other module surface, and it
- * is the one page whose content is created from itself. Hiding it would
- * hide the way to act on the rest — the opposite of what D37 is for.
- */
 export type ModuleState = {
   key: ModuleKey
-  /** The module holds at least one row. */
+  /** The sub-section holds at least one row. */
   hasContent: boolean
-  /** Turned on by hand, whether or not it holds anything. */
+  /** Ticked by hand, whether or not it holds anything. */
   enabled: boolean
 }
 
-/** Visible = holds something, OR turned on by hand. That is the whole rule. */
+/** Ticked, or holding something. That is the whole rule. */
 export function isVisible(state: ModuleState): boolean {
   return state.hasContent || state.enabled
 }
 
-/** The visible subset, in declaration order. */
-export function visibleModules(
+function stateOf(
   states: ReadonlyArray<ModuleState>,
-  among: ReadonlyArray<ModuleKey>,
-): Array<ModuleKey> {
-  return among.filter((key) => {
-    const state = states.find((row) => row.key === key)
-    return state ? isVisible(state) : true
-  })
+  key: ModuleKey,
+): ModuleState | undefined {
+  return states.find((row) => row.key === key)
 }
 
 /**
- * What the ⋯ menu offers: the modules that are hidden, i.e. empty AND not
- * turned on. A module holding something is never offered — it is already
- * there.
+ * The sub-sections on screen, in declaration order. Never empty: an org that
+ * holds nothing and has ticked nothing still gets `FALLBACK_MODULE`, so
+ * Investissements always has a page to open.
  */
-export function activatableModules(
+export function visibleModules(
   states: ReadonlyArray<ModuleState>,
-  among: ReadonlyArray<ModuleKey>,
 ): Array<ModuleKey> {
-  return among.filter((key) => {
-    const state = states.find((row) => row.key === key)
-    return state ? !isVisible(state) : false
+  const visible = ALL_MODULES.filter((key) => {
+    const state = stateOf(states, key)
+    // Unknown state = the query is still in flight: show it rather than
+    // flicker it away.
+    return state ? isVisible(state) : true
   })
+  return visible.length > 0 ? visible : [FALLBACK_MODULE]
+}
+
+/**
+ * Why a visible sub-section cannot be hidden, or null when it can be.
+ *
+ * `content` — it holds rows, and hiding it would take them with it.
+ * `last` — it is the only one left, and Investissements needs a page.
+ */
+export function hideBlockedBy(
+  states: ReadonlyArray<ModuleState>,
+  key: ModuleKey,
+): 'content' | 'last' | null {
+  if (stateOf(states, key)?.hasContent) return 'content'
+  const visible = visibleModules(states)
+  if (visible.length <= 1 && visible.includes(key)) return 'last'
+  return null
 }

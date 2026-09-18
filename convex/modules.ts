@@ -1,13 +1,13 @@
 /**
- * Which modules an org shows (SPEC D37).
+ * Which sub-sections of Investissements an org shows (SPEC D37, revised).
  *
- * « Un module s'affiche s'il contient quelque chose, ou s'il a été activé à
- * la main. » Nothing is cached: what each module holds is probed on every
- * read, so a module appears the moment its first row exists and disappears
- * again if that row is removed — unless someone turned it on by hand.
+ * The rules live in `lib/modules.ts` and are shared with the front; this
+ * file only answers « does this org hold anything under that sub-section? »
+ * and stores the hand-made choice. Since the platform stopped being modular,
+ * there are three probes left — the sidebar entries are always shown.
  *
  * The probes are all `.first()` — an existence question, never a count. A
- * module does not need to know how much it holds to know that it holds
+ * sub-section does not need to know how much it holds to know that it holds
  * something.
  */
 
@@ -28,11 +28,10 @@ type DealsReader = () => Promise<Array<Doc<'deals'>>>
  * Memoizes the org's deals for the duration of one `list` call.
  *
  * Deals are the one table a probe cannot answer with `.first()`: whether the
- * Entreprises tab holds something depends on the INSTRUMENT of each deal, so
- * the rows have to be read. Three probes need them — `entreprises`,
- * `placements`, and `investments`, which asks both — so reading them per
- * probe meant four reads of the whole table for one answer, on every
- * navigation, since the sidebar re-runs this query each time.
+ * Entreprises sub-section holds something depends on the INSTRUMENT of each
+ * deal, so the rows have to be read. Both `entreprises` and `placements` need
+ * them, so reading them per probe meant reading the whole table twice for one
+ * answer, on every navigation — the query re-runs on each.
  */
 function dealsReader(ctx: QueryCtx, orgId: Id<'organizations'>): DealsReader {
   let pending: Promise<Array<Doc<'deals'>>> | null = null
@@ -52,17 +51,11 @@ async function probe(
   key: ModuleKey,
   deals: DealsReader,
 ): Promise<boolean> {
-  const byOrg = (table: 'deals' | 'companies' | 'properties') =>
-    ctx.db
-      .query(table)
-      .withIndex('by_org', (q) => q.eq('orgId', orgId))
-      .first()
-
   switch (key) {
     case 'entreprises': {
       // A portfolio company, or a deal that is not a treasury placement.
       // The group's own entities do not count: every org has a root, and it
-      // would make the tab permanently non-empty.
+      // would make the sub-section permanently non-empty.
       const companies = await ctx.db
         .query('companies')
         .withIndex('by_org_kind', (q) =>
@@ -79,50 +72,12 @@ async function probe(
         isTreasuryPlacement(deal.instrumentKind),
       )
     case 'immobilier':
-      return (await byOrg('properties')) !== null
-    case 'investments':
-      // The section shows as soon as ANY of its three tabs holds something.
-      return (
-        (await probe(ctx, orgId, 'entreprises', deals)) ||
-        (await probe(ctx, orgId, 'placements', deals)) ||
-        (await probe(ctx, orgId, 'immobilier', deals))
-      )
-    case 'cash':
       return (
         (await ctx.db
-          .query('bankAccounts')
+          .query('properties')
           .withIndex('by_org', (q) => q.eq('orgId', orgId))
           .first()) !== null
       )
-    case 'passif': {
-      // Anything the Passif page can show: bank debt, equity, a current
-      // account on either side, or a security this org has pledged.
-      const loan = await ctx.db
-        .query('loans')
-        .withIndex('by_org', (q) => q.eq('orgId', orgId))
-        .first()
-      if (loan) return true
-      const equity = await ctx.db
-        .query('equityPositions')
-        .withIndex('by_org', (q) => q.eq('orgId', orgId))
-        .first()
-      if (equity) return true
-      const from = await ctx.db
-        .query('intercompanyLoans')
-        .withIndex('by_from', (q) => q.eq('fromOrgId', orgId))
-        .first()
-      if (from) return true
-      const to = await ctx.db
-        .query('intercompanyLoans')
-        .withIndex('by_to', (q) => q.eq('toOrgId', orgId))
-        .first()
-      if (to) return true
-      const pledged = await ctx.db
-        .query('guarantees')
-        .withIndex('by_pledgor_org', (q) => q.eq('pledgorOrgId', orgId))
-        .first()
-      return pledged !== null
-    }
   }
 }
 
