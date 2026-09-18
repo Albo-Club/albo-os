@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.243.1 — 18/09/2026 à 18:40 — Ménage : vider quatre tables inertes
+
+Outil de purge des quatre dernières tables héritées de fonctionnalités
+retirées (connexion Gmail, adresses d'envoi secondaires, anciennes
+connexions Vasco), avant de les retirer de la base. Rien ne change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/purgeInertTables.ts` : une `internalMutation` `run`
+>   avec `dryRun` qui compte puis vide `userEmailAliases`, `gmailAccounts`,
+>   `gmailOAuthStates` et `vascoConnections` — lecture entière par table
+>   (tables minuscules), comptes seulement en retour (deux tables portent des
+>   secrets au repos). Idempotente.
+> - `convex/regression.purgeInertTables.test.ts` : à blanc rien ne bouge,
+>   appliqué tout part, rejeu à zéro.
+> - `MIGRATIONS.md` : la ligne de l'opération (ordre, pas de snapshot
+>   spécifique, PR de suivi qui resserre le schéma).
 ## v1.243.0 — 18/09/2026 à 18:27 — L'onglet À faire réclame un relevé de titres quand il vieillit
 
 Quand une banque n'est pas couverte par la connexion bancaire — le cas de
