@@ -46,8 +46,8 @@ marge pour coller.
 ### Le piège
 
 Le réflexe est de coller le texte OCRisé dans un champ `documents.extractedText`
-(le champ existait d'ailleurs, déclaré et jamais écrit). Deux raisons de ne
-pas le faire, et la seconde est la vraie :
+(le champ a existé, déclaré et jamais écrit par ce repo, retiré le
+18/09/2026). Deux raisons de ne pas le faire, et la seconde est la vraie :
 
 1. **La ligne Convex est plafonnée à 1 Mo**, tous champs confondus (cf.
    `convex/_generated/ai/guidelines.md`). Un pacte de 350 pages en français
@@ -78,19 +78,22 @@ Donc : un nouveau chemin d'ingestion de fichiers doit écrire son texte via
 `documentsExtract:saveStorageText` (clé blob) et poser l'état sur sa ligne
 `documents` — jamais l'inverse.
 
-### Le champ legacy `documents.extractedText`
+### Le champ legacy `documents.extractedText` (retiré le 18/09/2026)
 
-Le champ existe encore au schéma. Il est écrit par **rien** dans ce repo et lu
-par **rien** — mais des lignes de prod le portent (le texte y a été mis
-hors du repo, avant `documentTexts`). Le retirer **casse `convex deploy`** :
-la validation de schéma refuse les lignes existantes (« Object contains extra
-field `extractedText` that is not in the validator »), et le build Vercel de
-prod échoue après le push des fonctions. Vérifié à la dure sur la PR #307.
+Le champ a longtemps survécu au schéma alors qu'il était écrit par **rien**
+dans ce repo et lu par **rien** : des lignes de prod le portaient (le texte y
+avait été mis hors du repo, avant `documentTexts`), et le retirer **cassait
+`convex deploy`** — la validation de schéma refuse les lignes existantes
+(« Object contains extra field `extractedText` that is not in the
+validator »), et le build Vercel de prod échoue après le push des fonctions.
+Vérifié à la dure sur la PR #307.
 
 Un `grep` du code ne suffit donc pas à conclure qu'un champ est mort : il dit
 qu'aucun code **actuel** ne l'écrit, pas qu'aucune **donnée** ne le porte.
-Avant de retirer un champ, regarder la prod. Le chantier de retrait
-(reprise du texte puis purge) est dans `MIGRATIONS.md`.
+Avant de retirer un champ, regarder la prod, puis « purger d'abord, resserrer
+ensuite ». Ici : une migration a vidé les 11 lignes qui le portaient encore
+(214 Ko, dont les 11 textes recopiés dans `documentTexts` faute d'y être) et
+le champ a quitté le schéma dans la PR suivante — cf. `MIGRATIONS.md`.
 
 ### Le corollaire qui mord — un blob se libère au comptage (ALB-240)
 
@@ -5930,12 +5933,11 @@ Le contrôle avant d'écrire une requête de liste : _est-ce qu'une des lignes
 que je collecte porte un champ qui peut peser des dizaines de Ko ?_ Si oui,
 un des deux remèdes ci-dessus, jamais un `.map()` de façade.
 
-**Restent à traiter** (mêmes symptômes, moindre volume) : `documents` et son
-champ legacy `extractedText` (chantier de purge déjà ouvert dans
-`MIGRATIONS.md`), lu à chaque ouverture de fiche société ; `reportInbox.list`
+**Restent à traiter** (mêmes symptômes, moindre volume) : `reportInbox.list`
 qui prend 100 `inboundEmails` avec `bodyText` + `bodyHtml` + `extractedText` ;
 et `companyReports.listByCompany` qui prend 200 lignes avec `rawContent` pour
-n'afficher que titre et période.
+n'afficher que titre et période. (Le champ legacy `documents.extractedText`,
+lui, a été vidé puis retiré le 18/09/2026.)
 
 Pour instrumenter : dashboard Convex → **Functions**, colonne _Database
 bandwidth_, triée décroissante. Elle nomme le coupable en une minute.

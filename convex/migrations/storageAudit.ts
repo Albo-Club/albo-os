@@ -27,10 +27,11 @@
  *
  * `scanPage` reads the `_storage` system table (tiny rows: id, size,
  * contentType). `describe` joins ONLY the biggest blobs back to `documents`
- * via `by_storage` to name them — deliberately capped, because a `documents`
- * row still carries the legacy `extractedText` field, so sweeping the whole
- * table would itself be the "big text field on a listed row" anti-pattern
- * this audit exists to price (cf. CLAUDE.md).
+ * via `by_storage` to name them — deliberately capped: naming thirty blobs
+ * needs thirty point lookups, not a sweep of the table (which, until
+ * 18/09/2026, still carried a legacy `extractedText` field on every row —
+ * the very "big text field on a listed row" anti-pattern this audit exists
+ * to price, cf. CLAUDE.md).
  *
  * `scanHolders` answers the only question that makes a deletion safe: WHO
  * still points at a blob. "No `documents` row" is not "unreferenced" — six

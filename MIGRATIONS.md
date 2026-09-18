@@ -68,7 +68,7 @@ pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip
 | Purge des fichiers orphelins (**destructif**) | `convex/migrations/storagePurge.ts` (`deleteOrphans`) + `node scripts/storage-purge.mjs` | Supprime les blobs du file storage que **plus rien** ne référence — 501 Mo, 28 % du stockage au 11/09/2026, dont 564 sur 565 étaient le sosie exact d'un fichier encore présent ailleurs (on ne perd donc aucun octet unique). **Lancer d'abord le correctif de la source** : ces copies venaient du proxy de téléchargement Parallel, qui en déposait une par clic sans jamais l'effacer (corrigé le 11/09/2026) — purger une fuite qui coule encore n'achète que quelques semaines. **Ordre** : `pnpm exec convex export --prod --include-file-storage --path ./avant-purge-$(date +%Y%m%d-%H%M).zip` → `node scripts/storage-purge.mjs` (à blanc, lit le compte et le poids) → `--apply`. ⚠️ **`--include-file-storage` n'est pas optionnel ici, et `--path` non plus.** Sans `--path` la commande **échoue** (et si les lignes sont collées d'un bloc, la purge s'exécute quand même derrière l'échec — c'est arrivé le 11/09/2026). Sans `--include-file-storage`, l'export ne contient **aucun fichier** : le filet ne rattrape pas ce que cette purge supprime. Vérifier que le `.zip` existe et pèse plus que la base avant de lancer `--apply`. Idempotent : un second passage ne trouve plus rien. **Deux planchers, tous deux re-vérifiés côté serveur** parce que le balayage a fini depuis plusieurs minutes : aucun fichier de moins de 24 h (un upload dépose ses octets AVANT la ligne qui les désigne, donc un blob frais sans porteur est un envoi en cours, pas un orphelin — c'est le garde-fou qui protège un utilisateur), et aucune ligne `documents` ne l'a réclamé entre-temps. Les quatre autres tables porteuses ne sont pas re-vérifiées, exception raisonnée : chacune ne désigne qu'un blob qu'elle vient de créer, donc aucune ne peut réclamer un blob déjà vieux et sans porteur — cf. `KNOWN_ISSUES.md`. Le texte extrait (`documentTexts`) part avec le fichier. |
 | Véhicule en tête de nom de fiche (org `calte`) | `convex/migrations/renameSideVehicles.ts` → `dryRun` / `apply` / `report` | Déplace le véhicule en **fin** de nom, entre parenthèses : `SIDE  TIMELEFT` → `TIMELEFT (SIDE)`. 48 fiches (SIDE, ASTERION, plus `SPACELY STOCKAGE (STOCKOSS)`). Le rattachement d'un report cherche le nom de la fiche **en entier** dans le mail et ignore la parenthèse finale (`convex/lib/emailIdentify.ts`) : tant que le véhicule était devant, aucun fondateur n'écrivant « SIDE TIMELEFT », ces participations ne pouvaient se rattacher que par le domaine de l'expéditeur — donc jamais sur un transfert par un tiers. **Ne touche pas** les 8 fiches où le fonds EST la participation (`SIDE 1/2/3`, `SIDE INVEST`, `SIDE Invest 2/3` sur `side-capital.com`, `ASTERION F1/F2`) : là, « SIDE » est le nom, pas un préfixe. Ancrage par `_id` prod + garde sur le nom stocké (comparé espaces normalisés — 8 de ces fiches portent un espace double ou final). Idempotent : une fiche déjà renommée est comptée `alreadyRenamed`, une fiche renommée à la main entre-temps est signalée `anchorMismatch` et **pas** réécrite. **Ordre** : `pnpm exec convex export --prod --path ./albo-backup-$(date +%Y%m%d-%H%M).zip` (vérifier que le `.zip` existe) → `dryRun` (lire la liste from → to) → `apply` → `report`. |
 | Purge des entrées RAG remplacées (**destructif**, sans perte) | `convex/vectorize.ts` → `cleanupReplacedEntries` (+ cron horaire du même nom) | Efface les entrées du composant RAG marquées `replaced` depuis plus d'une heure — chunks et embeddings des versions qu'une ré-indexation a remplacées, qu'aucune recherche ne lit et que le composant ne supprime jamais seul (cf. `KNOWN_ISSUES.md` « Le composant RAG garde chaque version remplacée »). ~5 Go en prod au 17/09/2026, lus en entier par chaque `convex export` de l'ancien backup. **Pas de snapshot préalable** : rien d'unique n'est détruit, une entrée `replaced` se recalcule depuis son document (`vectorize:backfillAll`). Un seul appel suffit — la mutation traite **une entrée par transaction** (`rag.deleteAsync` efface déjà jusqu'à 8 Mo de chunks dans l'appelant, cf. `KNOWN_ISSUES.md`) et se replanifie jusqu'à épuisement : `pnpm exec convex run --prod vectorize:cleanupReplacedEntries '{}'`. La commande rend la main tout de suite (`{ deleted: 1, done: false }`) ; la purge continue en arrière-plan, à suivre dans Logs (une exécution par entrée). Idempotente ; le cron la relance chaque heure. Vérifier : Data → composant `rag` → `entries`, plus aucune ligne `replaced` ancienne, et Database Storage en baisse nette sur le dashboard Usage. |
-| Champ legacy `documents.extractedText` (vidage) | `convex/migrations/legacyExtractedText.ts` (`scanPage` / `migrateBatch`) + `node scripts/legacy-extracted-text.mjs` | Vide le champ mort `extractedText` des lignes `documents` qui le portent encore — texte mis là avant `documentTexts`, lu par rien, mais payé à chaque lecture de la ligne (fiche société, onglet Documents, outils agent). **Le texte n'est pas jeté** : une ligne dont le fichier n'a pas encore de `documentTexts` en reçoit un depuis la copie legacy (pas d'OCR à repayer), avec `ocrState: 'extracted'` + `ocrChars`, et son `vectorState` remis à zéro pour que `vectorize:backfillAll` l'indexe (un document sans texte avait été marqué `skipped`) ; une ligne dont le fichier a déjà son texte perd juste le doublon. **Ordre** : Actions → « Convex backup » → Run workflow (données seules suffisent, rien n'est supprimé côté fichiers) → `node scripts/legacy-extracted-text.mjs` (à blanc : combien de lignes, combien de Mo) → `--apply` → relancer à blanc, le compte doit être à zéro → si `copied > 0`, `pnpm exec convex run --prod vectorize:backfillAll '{}'`. Lots de 4 documents par transaction (une ligne + son `documentTexts` peuvent approcher 1 Mio chacun). Idempotent. Quand la prod est à zéro : PR de suivi qui retire le champ du schéma (cf. le chantier ci-dessous). |
+| Champ legacy `documents.extractedText` (vidage — **fait le 18/09/2026**) | `convex/migrations/legacyExtractedText.ts` + `scripts/legacy-extracted-text.mjs` (retirés avec le champ, PR de suivi) | A vidé le champ mort `extractedText` des lignes `documents` qui le portaient encore — texte mis là avant `documentTexts`, lu par rien, mais payé à chaque lecture de la ligne. Résultat en prod : 1 714 documents balayés, **11** portaient le champ (214 Ko), 11 textes recopiés dans `documentTexts` (aucun n'y était), `ocrState: 'extracted'` + `ocrChars` posés, `vectorState` remis à zéro puis `vectorize:backfillAll` relancé. Le champ a quitté le schéma dans la PR suivante, avec le module, le script et leur test. Si un ancien export réintroduisait des lignes portant le champ, le déploiement échouerait sur la validation de schéma : rejouer la même logique (recopier le texte vers `documentTexts` s'il n'y est pas, effacer le champ) avant de resserrer. |
 
 Les ponts Attio (`attioCompanyId` / `attioDealId`) et l'ingestion Powens sont
 des flux **continus**, pas des migrations (la fusion Palatine ci-dessus est
@@ -309,38 +309,22 @@ dégradée : un `import --replace-all` sur la prod est destructif. La procédure
 est écrite, pas testée. La dérouler une fois à blanc — et trancher au passage
 le cas dégradé ci-dessus — mérite sa propre tâche.
 
-## Chantier : retrait du champ legacy `documents.extractedText`
+## Retrait du champ legacy `documents.extractedText` (fait — 18/09/2026)
 
-Le champ n'est **écrit par aucun code de ce repo** (aucun commit ne l'alimente)
-et n'est **lu par rien** depuis que le texte extrait vit dans `documentTexts`
-(cf. `KNOWN_ISSUES.md` « Texte extrait d'un document »). Mais des lignes de
-prod le portent — le texte y a été mis hors du repo, avant `documentTexts`.
+Le champ n'était **écrit par aucun code de ce repo** et **lu par rien** depuis
+que le texte extrait vit dans `documentTexts` (cf. `KNOWN_ISSUES.md` « Texte
+extrait d'un document »), mais des lignes de prod le portaient — le texte y
+avait été mis hors du repo, avant `documentTexts`. Le retirer du schéma
+**cassait `convex deploy`** (validation des lignes existantes ; vécu sur la
+PR #307, le champ avait dû être remis). Règle « purger d'abord, resserrer
+ensuite », déroulée en deux PR :
 
-Le retirer du schéma **casse `convex deploy`** : la validation refuse les
-lignes existantes (« Object contains extra field `extractedText` that is not
-in the validator »). C'est arrivé une fois, sur le déploiement de la PR #307 —
-le champ a dû être remis. Règle « purger d'abord, resserrer ensuite » :
-
-1. **Reprise + purge (à exécuter en prod)** — outillée le 18/09/2026 :
-   `convex/migrations/legacyExtractedText.ts` + `node
-   scripts/legacy-extracted-text.mjs` (ligne dédiée dans le tableau
-   ci-dessus). Ne jette pas le texte : une ligne dont le fichier n'a pas de
-   `documentTexts` en reçoit un depuis la copie legacy (pas d'OCR à repayer),
-   avec `ocrState: 'extracted'` + `ocrChars` et un `vectorState` remis à zéro
-   pour que `vectorize:backfillAll` l'indexe ; les autres perdent juste le
-   doublon.
-
-   ```bash
-   # snapshot : Actions → « Convex backup » → Run workflow (données seules)
-   node scripts/legacy-extracted-text.mjs            # à blanc
-   node scripts/legacy-extracted-text.mjs --apply
-   node scripts/legacy-extracted-text.mjs            # doit dire zéro
-   ```
-
-2. **Resserrage** : une fois la prod à zéro ligne portant le champ, retirer
-   `extractedText` du `documents` de `convex/schema.ts` dans une PR de suivi
-   (et le `documents` de `scanPage` cessera de compiler : supprimer le module
-   et le script dans la même PR, leur travail est fini).
+1. **Reprise + purge** (#499, exécutée le 18/09/2026) : 11 lignes sur 1 714
+   portaient encore le champ, 214 Ko ; les 11 textes ont été recopiés dans
+   `documentTexts` (aucun n'y était) et réindexés — ligne dédiée dans le
+   tableau ci-dessus.
+2. **Resserrage** (PR de suivi) : champ retiré de `convex/schema.ts`, module,
+   script et test de la migration supprimés avec lui.
 
 ## Chantier : retrait de la table legacy `vascoConnections`
 

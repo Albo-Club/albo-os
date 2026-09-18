@@ -23,6 +23,27 @@ bas de page.
 
 ---
 
+## v1.239.1 — 18/09/2026 à 13:50 — Ménage : l'ancienne copie du texte des documents a disparu
+
+Suite et fin du ménage commencé ce matin : l'ancienne copie du texte extrait
+n'existe plus nulle part, ni dans les données (11 documents la portaient
+encore, leur texte a été remis au bon endroit), ni dans la structure de la
+base. Rien de visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : champ `documents.extractedText` retiré (prod à zéro
+>   ligne le portant depuis la migration #499 : 11 lignes, 214 Ko, 11 textes
+>   recopiés dans `documentTexts`, `backfillAll` relancé).
+> - Suppression de `convex/migrations/legacyExtractedText.ts`,
+>   `scripts/legacy-extracted-text.mjs` et
+>   `convex/regression.legacyExtractedText.test.ts` : leur travail est fini,
+>   et le test insérait le champ.
+> - Commentaires alignés dans `convex/migrations/storageAudit.ts` et
+>   `alboReportsImport.ts` ; `KNOWN_ISSUES.md` (section « champ legacy »
+>   passée au passé, retirée de « Restent à traiter ») ; `MIGRATIONS.md`
+>   (ligne du tableau et chantier marqués faits).
+
 ## v1.239.0 — 18/09/2026 à 13:35 — L'assistant et le connecteur Claude lisent la fiche complète d'un deal et le % de détention
 
 Jusqu'ici, l'assistant in-app et le connecteur Claude ne voyaient d'un deal
