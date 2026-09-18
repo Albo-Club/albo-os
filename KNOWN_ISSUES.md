@@ -5112,7 +5112,7 @@ Pièges si on retouche cette zone :
   guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
   court-circuite pas la logique anti-flash.
 
-## Tables Gmail inertes (`gmailAccounts`, `gmailOAuthStates`, `companyEmails`, `companyEmailLinks`)
+## Tables Gmail inertes (`gmailAccounts`, `gmailOAuthStates`)
 
 La feature « emails du portfolio » (connecteur Gmail OAuth, timeline
 d'emails par participation, page `/emails`) a été **entièrement retirée**
@@ -5120,10 +5120,12 @@ d'emails par participation, page `/emails`) a été **entièrement retirée**
 plutôt que de laisser traîner une version non satisfaisante. Le code reste
 dans l'historique git si besoin de s'en inspirer.
 
-- Les 4 tables ci-dessus restent **déclarées mais inertes** au schéma
+- Les 2 tables ci-dessus restent **déclarées mais inertes** au schéma
   (même stance que la table legacy `forecasts`) : aucune purge de la
   donnée prod n'a été faite. Les retirer = purger d'abord, puis resserrer
-  (widen-migrate-narrow).
+  (widen-migrate-narrow) — le chemin qu'ont suivi `companyEmails` et
+  `companyEmailLinks`, vidées puis retirées du schéma le 18/09/2026 (cf.
+  `MIGRATIONS.md` « Purge de l'ancienne timeline d'e-mails »).
 - Le pipeline **reports** (AgentMail → `inboundEmails`) est indépendant et
   reste actif : seules les lignes `inboundEmails` historiques à provenance
   synthétique `gmail:<id>` (ancien pont « Extraire le report ») lisent
@@ -6960,30 +6962,28 @@ les blobs qu'à `documents` — d'où une colonne « (aucune ligne documents) »
 facile à lire comme « personne ne s'en sert, on peut supprimer ». C'est faux, et
 le croire coûte une pièce jointe perdue.
 
-**Six** champs du schéma pointent sur `_storage` :
+**Cinq** champs du schéma pointent sur `_storage` :
 
 | Table | Champ | Nature |
 | --- | --- | --- |
 | `documents` | `storageId` | le document d'une fiche |
 | `inboundEmails` | `attachments[].storageId` | pièce jointe reçue (optionnel : le fichier peut n'avoir jamais été rangé) |
-| `companyEmails` | `attachments[].storageId` | **timeline email RETIRÉE** — table inerte, plus lue par rien, mais ses fichiers sont toujours là |
 | `users` | `avatarStorageId` | avatar |
 | `organizations` | `logoStorageId` | logo |
 | `documentTexts` | `storageId` | **pas un porteur** — le texte extrait DU blob, donc jamais une raison de le garder ; il part avec lui |
 
 Une pièce jointe de mail jamais promue en document est donc parfaitement
 utilisée **et** invisible à la jointure `documents`. Le critère de suppression
-est « aucun des cinq vrais porteurs », pas « pas de ligne `documents` ».
+est « aucun des quatre vrais porteurs », pas « pas de ligne `documents` ».
 
 **Corollaire, et c'est le vrai piège** : `releaseStorage`
 (`convex/lib/documentBlobs.ts`) ne vérifie que `documents` **plus le seul mail
-qu'on lui passe en argument**. Il ignore `companyEmails`, les avatars, les logos
-et les autres lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux
-transferts du même fichier produisent deux blobs distincts, pas un blob partagé,
-et la timeline retirée ne partage rien avec les documents — mais **une purge en
-masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des cinq
-porteurs elle-même. Le jour où un chemin fera vraiment partager un blob entre
-deux mails, le refcount le ratera.
+qu'on lui passe en argument**. Il ignore les avatars, les logos et les autres
+lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux transferts du
+même fichier produisent deux blobs distincts, pas un blob partagé — mais **une
+purge en masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des
+quatre porteurs elle-même. Le jour où un chemin fera vraiment partager un blob
+entre deux mails, le refcount le ratera.
 
 Mesure : `node scripts/storage-audit.mjs`, section « Qui référence les
 fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
@@ -7036,7 +7036,7 @@ facture qui monte. Deux réflexes :
 Le contrôle de réclamation se limite ici à `documents`, et c'est délibéré :
 l'id du blob naît dans l'action et n'est rendu à personne, donc aucun mail,
 avatar ni logo ne peut le désigner. Une purge en masse, elle, doit bien faire
-le tour des cinq porteurs — cf. la section « Aucune ligne `documents` ne veut
+le tour des quatre porteurs — cf. la section « Aucune ligne `documents` ne veut
 pas dire fichier orphelin ».
 
 ---

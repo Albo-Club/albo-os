@@ -56,7 +56,7 @@ test('tally ne perd aucun octet', () => {
   ])
   const holders = new Map([
     ['a', new Set(['documents'])],
-    ['b', new Set(['companyEmails'])],
+    ['b', new Set(['inboundEmails'])],
   ])
   const counts = tally([...m.keys()], holders, m)
   const total = [...counts.values()].reduce((n, s) => n + s.bytes, 0)
@@ -148,6 +148,6 @@ test('un blob sans date de création est épargné', () => {
 
 test('la purge ne rend jamais un blob encore tenu, même très vieux', () => {
   const m = meta([['ancient', 10, 0]])
-  const holders = new Map([['ancient', new Set(['companyEmails'])]])
+  const holders = new Map([['ancient', new Set(['inboundEmails'])]])
   assert.deepEqual(purgeableOrphans(m, holders, { now: DAY * 1000 }), [])
 })

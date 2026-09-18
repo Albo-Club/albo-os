@@ -481,6 +481,11 @@ async function loadScope(ctx: Ctx, orgId: Id<'organizations'>) {
 
 type Scope = Awaited<ReturnType<typeof loadScope>>
 
+/**
+ * Every row pointing at a company, per table — used to guard archiving.
+ * (`companyEmailLinks` was part of it until that table was purged and dropped
+ * on 18/09/2026 — MIGRATIONS.md « Purge de l'ancienne timeline d'e-mails ».)
+ */
 async function incomingRefs(
   ctx: Ctx,
   orgId: Id<'organizations'>,
@@ -495,7 +500,6 @@ async function incomingRefs(
     docs,
     reports,
     intel,
-    links,
     banks,
   ] = await Promise.all([
     ctx.db
@@ -535,10 +539,6 @@ async function incomingRefs(
       .withIndex('by_company', (q) => q.eq('companyId', id))
       .collect(),
     ctx.db
-      .query('companyEmailLinks')
-      .withIndex('by_company_and_sentAt', (q) => q.eq('companyId', id))
-      .collect(),
-    ctx.db
       .query('bankAccounts')
       .withIndex('by_owner', (q) =>
         q.eq('orgId', orgId).eq('ownerCompanyId', id),
@@ -554,7 +554,6 @@ async function incomingRefs(
     documents: docs.length,
     reports: reports.length,
     intelligence: intel.length,
-    emailLinks: links.length,
     bankAccounts: banks.length,
     kpiSnapshots: scope.kpis.filter((k) => k.companyId === id).length,
     todos: scope.todos.filter((t) => t.companyId === id).length,

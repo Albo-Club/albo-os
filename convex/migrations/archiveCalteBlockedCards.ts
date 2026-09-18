@@ -6,9 +6,11 @@
  * report than orphan a row. What each was holding:
  *
  *   - `SERENDIP INVEST` and `Calte SASU` — one `companyEmailLinks` row each.
- *     That table is LEGACY, «declared but inert», read by nothing (cf.
- *     convex/schema.ts): a leftover of the retired e-mail feature, and the only
- *     reference the app offers no way to clear. Dropping the row loses nothing.
+ *     That table was LEGACY, «declared but inert», read by nothing: a leftover
+ *     of the retired e-mail feature, and the only reference the app offered no
+ *     way to clear. Dropping the row lost nothing. It has since been purged and
+ *     dropped from the schema (18/09/2026, MIGRATIONS.md « Purge de l'ancienne
+ *     timeline d'e-mails »), so this migration no longer knows about it.
  *   - `Upcyclea` — a 2025 annual report, its PDF, its `companyIntelligence`
  *     slot and the 17 KPI snapshots that report sourced. NOT a dealflow card as
  *     first read: Upcyclea is an `albo` holding, whose card there already
@@ -24,7 +26,8 @@
  * below, in that order.
  *
  * What this migration does — and only that:
- *   1. Deletes the legacy `companyEmailLinks` rows of the three cards.
+ *   1. Deleted the legacy `companyEmailLinks` rows of the three cards — a step
+ *      that is gone from the code with the table (see above).
  *   2. Deletes the leftover `companyIntelligence` row (derived data, rebuilt on
  *      demand — same call as `cleanupCalteImport`, which drops it rather than
  *      leave it on an archived card; `detachCompany` only clears its pointer).
@@ -33,7 +36,8 @@
  * Idempotent & guarded, like its siblings: cards are anchored by their prod
  * `_id` and cross-checked on their exact current name, an already-archived card
  * is a no-op, and a card that still carries anything else is reported instead
- * of archived. Nothing is hard-deleted except the two row kinds named above.
+ * of archived. Nothing is hard-deleted except the `companyIntelligence` rows
+ * named above.
  *
  * Execution order (prod, manual):
  *   # 1. In the app, org calte, Upcyclea card → Documents & rapports →
@@ -101,7 +105,6 @@ async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
     docs,
     reports,
     intel,
-    links,
     banks,
     kpis,
     todos,
@@ -149,10 +152,6 @@ async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
       .withIndex('by_company', (q) => q.eq('companyId', id))
       .collect(),
     ctx.db
-      .query('companyEmailLinks')
-      .withIndex('by_company_and_sentAt', (q) => q.eq('companyId', id))
-      .collect(),
-    ctx.db
       .query('bankAccounts')
       .withIndex('by_owner', (q) =>
         q.eq('orgId', orgId).eq('ownerCompanyId', id),
@@ -179,7 +178,7 @@ async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
       .collect(),
   ])
   return {
-    clearable: { emailLinks: links, intelligence: intel },
+    clearable: { intelligence: intel },
     blocking: {
       deals:
         asTarget.length +
@@ -232,10 +231,7 @@ export const dryRun = internalQuery({
         return {
           name: spec.expectedName,
           wasBlockedBy: spec.blockedBy,
-          willDelete: {
-            emailLinks: r.clearable.emailLinks.length,
-            intelligence: r.clearable.intelligence.length,
-          },
+          willDelete: { intelligence: r.clearable.intelligence.length },
           ready: !blocked,
           ...(blocked ? { stillBlockedBy: stillBlocking(r.blocking) } : {}),
         }
@@ -268,7 +264,6 @@ export const apply = internalMutation({
     const orgId = org._id
     const archived: Array<string> = []
     const skipped: Array<string> = []
-    let emailLinksDeleted = 0
     let intelligenceDeleted = 0
 
     for (const spec of CARDS) {
@@ -301,10 +296,6 @@ export const apply = internalMutation({
         continue
       }
 
-      for (const link of r.clearable.emailLinks) {
-        await ctx.db.delete('companyEmailLinks', link._id)
-        emailLinksDeleted += 1
-      }
       for (const row of r.clearable.intelligence) {
         await ctx.db.delete('companyIntelligence', row._id)
         intelligenceDeleted += 1
@@ -313,6 +304,6 @@ export const apply = internalMutation({
       archived.push(spec.expectedName)
     }
 
-    return { archived, emailLinksDeleted, intelligenceDeleted, skipped }
+    return { archived, intelligenceDeleted, skipped }
   },
 })
