@@ -133,7 +133,6 @@ import type * as migrations_collapseGroupKinds from "../migrations/collapseGroup
 import type * as migrations_consolidateRewattCalte from "../migrations/consolidateRewattCalte.js";
 import type * as migrations_createSubsidiaryOrgs from "../migrations/createSubsidiaryOrgs.js";
 import type * as migrations_dedupPowensTransactions from "../migrations/dedupPowensTransactions.js";
-import type * as migrations_externalConnections from "../migrations/externalConnections.js";
 import type * as migrations_fixLoanDirection from "../migrations/fixLoanDirection.js";
 import type * as migrations_fixSpvPitches from "../migrations/fixSpvPitches.js";
 import type * as migrations_legalDocsImport from "../migrations/legalDocsImport.js";
@@ -307,7 +306,6 @@ declare const fullApi: ApiFromModules<{
   "migrations/consolidateRewattCalte": typeof migrations_consolidateRewattCalte;
   "migrations/createSubsidiaryOrgs": typeof migrations_createSubsidiaryOrgs;
   "migrations/dedupPowensTransactions": typeof migrations_dedupPowensTransactions;
-  "migrations/externalConnections": typeof migrations_externalConnections;
   "migrations/fixLoanDirection": typeof migrations_fixLoanDirection;
   "migrations/fixSpvPitches": typeof migrations_fixSpvPitches;
   "migrations/legalDocsImport": typeof migrations_legalDocsImport;
