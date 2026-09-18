@@ -34,7 +34,10 @@
  * Safety, in order:
  *   1. the archive is verified (CRC + expected tables) BEFORE it is uploaded;
  *   2. the purge only runs after the upload is confirmed;
- *   3. a name this script did not write is never deleted.
+ *   3. a name this script did not write is never touched;
+ *   4. a purged archive goes to the shared drive's TRASH, not to permanent
+ *      deletion — the trash empties itself after 30 days, and the purge is
+ *      verified on the API's answer, never assumed from a silent response.
  * A corrupt archive pushed silently is worse than no backup at all.
  *
  * Environment:
@@ -304,15 +307,45 @@ async function listArchives(token, folderId) {
   return files
 }
 
-async function deleteArchive(token, id) {
-  const res = await fetch(`${FILES_URL}/${id}?supportsAllDrives=true`, {
-    method: 'DELETE',
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  // 404 = already gone: a previous run purged it, nothing to report.
-  if (!res.ok && res.status !== 404) {
-    throw new Error(`Suppression refusée (${res.status}) : ${await res.text()}`)
+/**
+ * Move an archive to the shared drive's trash. NOT `files.delete`: on a
+ * shared drive, permanent deletion needs the "Gestionnaire" (organizer) role,
+ * and the service account is only "Gestionnaire de contenu" (fileOrganizer)
+ * — the least it needs to write. With that role `DELETE` came back without an
+ * error the script would stop on, and the folder never shrank while every run
+ * printed "purgée" (10 nights, 18/09/2026). Trashing is allowed to a content
+ * manager, and Drive empties a shared drive's trash after 30 days, so the
+ * archive still disappears — with a month to notice a wrong rotation.
+ *
+ * `fields=trashed` makes Drive echo the resulting state: a 2xx whose body
+ * does not say `trashed: true` is a silent no-op and is treated as a failure.
+ * Returns false when the file is already gone (404).
+ */
+async function trashArchive(token, id) {
+  const res = await fetch(
+    `${FILES_URL}/${id}?supportsAllDrives=true&fields=trashed`,
+    {
+      method: 'PATCH',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json; charset=UTF-8',
+      },
+      body: JSON.stringify({ trashed: true }),
+    },
+  )
+  if (res.status === 404) return false
+  if (!res.ok) {
+    throw new Error(
+      `Mise à la corbeille refusée (${res.status}) : ${await res.text()}`,
+    )
   }
+  const body = await res.json()
+  if (body.trashed !== true) {
+    throw new Error(
+      `Mise à la corbeille sans effet (${id}) : Drive répond ${JSON.stringify(body)}.`,
+    )
+  }
+  return true
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────
@@ -347,10 +380,10 @@ async function main() {
     ])
 
     if (dry) {
-      console.log(`\n[--dry] rien n'est envoyé ni supprimé.`)
+      console.log(`\n[--dry] rien n'est envoyé ni mis à la corbeille.`)
       console.log(`  garderait  : ${keep.length} archives`)
       console.log(
-        `  supprimerait : ${drop.length ? drop.join(', ') : '(aucune)'}`,
+        `  mettrait à la corbeille : ${drop.length ? drop.join(', ') : '(aucune)'}`,
       )
       if (unknown.length) console.log(`  ignorerait : ${unknown.join(', ')}`)
       return
@@ -367,18 +400,26 @@ async function main() {
     }
     if (keep.length === 0) {
       // Cannot happen (today's archive is always kept), so if it does the
-      // rotation is wrong and deleting would be the worst possible move.
+      // rotation is wrong and purging would be the worst possible move.
       console.log('  ⚠️ rétention vide — purge annulée par sécurité.')
       return
     }
     const byName = new Map(existing.map((f) => [f.name, f.id]))
+    let purged = 0
     for (const stale of drop) {
       const id = byName.get(stale)
       if (!id) continue
-      await deleteArchive(token, id)
-      console.log(`  purgée : ${stale}`)
+      if (await trashArchive(token, id)) {
+        purged += 1
+        console.log(`  mise à la corbeille : ${stale}`)
+      } else {
+        // Gone between the listing and now: say so, never count it.
+        console.log(`  introuvable, ignorée : ${stale}`)
+      }
     }
-    console.log(`\n${keep.length} archives conservées, ${drop.length} purgées.`)
+    console.log(
+      `\n${keep.length} archives conservées, ${purged} mise(s) à la corbeille.`,
+    )
   } finally {
     await rm(dir, { recursive: true, force: true })
   }
