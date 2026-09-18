@@ -22,11 +22,13 @@ import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
 import { ParticipationsView } from '~/components/participations/ParticipationsView'
 import { InvestmentsTabs } from '~/components/investments/InvestmentsTabs'
+import { SubsectionsItems } from '~/components/investments/SubsectionsMenu'
 import { Button } from '~/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import {
@@ -382,6 +384,8 @@ function Participations() {
                       <Download className="size-4" />
                       {t('export.xlsx')}
                     </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <SubsectionsItems orgId={org._id} />
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
