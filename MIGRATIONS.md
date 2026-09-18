@@ -188,10 +188,18 @@ Le chemin du provider à reporter dans GitHub :
 
 Drive → **Drives partagés** → nouveau drive (ex. `Albo OS — Backups`) → y créer
 un dossier `snapshots` → **Gérer les membres** → ajouter l'e-mail du compte de
-service en **Gestionnaire de contenu** (il doit pouvoir écrire *et* supprimer,
-sinon la purge échoue). Google avertit que l'adresse est hors de
-l'organisation : normal pour un compte de service. Relever l'ID du dossier
-dans son URL.
+service en **Gestionnaire de contenu** (il doit pouvoir écrire *et* mettre à
+la corbeille — c'est ce que fait la purge, pas une suppression définitive).
+Google avertit que l'adresse est hors de l'organisation : normal pour un
+compte de service. Relever l'ID du dossier dans son URL.
+
+⚠️ Ne pas monter le compte en **Gestionnaire** pour « permettre la
+suppression » : la purge n'en a pas besoin. Une archive purgée part dans la
+corbeille du Drive partagé, que Google vide seule au bout de 30 jours ; la
+suppression définitive, elle, est réservée au rôle Gestionnaire, qui donne
+aussi le droit de gérer les membres et de supprimer le Drive entier — cf.
+`KNOWN_ISSUES.md` « Un Gestionnaire de contenu ne supprime pas sur un Drive
+partagé ».
 
 ⚠️ Un compte de service **n'a aucun quota de stockage propre**. Pointé
 ailleurs que sur un Drive partagé dont il est membre, l'upload échoue. C'est
@@ -254,7 +262,10 @@ node scripts/convex-backup.mjs --dry   # dit ce qui partirait et ce qui serait p
 
 Puis, pour de vrai : Actions → « Convex backup » → Run workflow, en cochant
 **« Forcer une archive complète »** au premier essai — ça valide d'un coup
-l'export, les fichiers, l'auth WIF, l'upload et la purge.
+l'export, les fichiers, l'auth WIF, l'upload et la purge. Pour la purge, ne
+pas se fier au seul log : chaque archive annoncée « mise à la corbeille »
+doit avoir quitté le dossier et apparaître dans la **corbeille du Drive
+partagé**.
 
 Un échec ouvre une issue labellisée `convex-backup`. Deux exceptions
 volontaires, qui sont des états de setup et non des incidents : une

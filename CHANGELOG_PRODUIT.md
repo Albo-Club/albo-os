@@ -23,6 +23,28 @@ bas de page.
 
 ---
 
+## v1.239.2 — 18/09/2026 à 14:55 — La rotation des sauvegardes fait vraiment le ménage
+
+La sauvegarde quotidienne annonçait depuis dix jours qu'elle purgeait les
+archives trop anciennes du Drive, sans que rien ne parte : le dossier
+grossissait d'une archive par jour. Les archives hors rotation sont
+désormais mises à la corbeille du Drive partagé (vidée automatiquement au
+bout de 30 jours), et le run vérifie que l'action a bien eu lieu au lieu de
+le supposer. Rien de visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/convex-backup.mjs` : `deleteArchive` (`DELETE`, réservé au rôle
+>   Gestionnaire sur un Drive partagé — le compte de service est Gestionnaire
+>   de contenu) remplacé par `trashArchive` (`PATCH { trashed: true }` avec
+>   `fields=trashed`, réponse contrôlée, 404 loggé « introuvable, ignorée » et
+>   non compté). Le résumé de fin de run compte les mises à la corbeille
+>   réelles.
+> - `KNOWN_ISSUES.md` : nouvelle section « Un Gestionnaire de contenu ne
+>   supprime pas sur un Drive partagé » ; `MIGRATIONS.md` (étape 3 du runbook :
+>   ne pas monter le compte en Gestionnaire, vérifier la corbeille) ;
+>   `TESTING.md` B12.
+
 ## v1.239.1 — 18/09/2026 à 13:50 — Ménage : l'ancienne copie du texte des documents a disparu
 
 Suite et fin du ménage commencé ce matin : l'ancienne copie du texte extrait
