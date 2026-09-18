@@ -4605,9 +4605,9 @@ pas en double.
   one row per client × org), managed by the connections core
   (`convex/connections.ts` + registry `convex/lib/connectors.ts`), never
   returned to the client (same rule as `powensUsers`). The legacy
-  `vascoConnections` table is declared-but-inert after the one-shot
-  `migrations/externalConnections:migrateVascoConnections` (cf.
-  `MIGRATIONS.md`).
+  `vascoConnections` table was copied over by a one-shot
+  (`migrateVascoConnections`), then purged and dropped from the schema on
+  18/09/2026 (cf. `MIGRATIONS.md` « Purge des tables inertes »).
 
 ### The investor-scoping trap (this cost the reverse-engineering)
 
@@ -5116,7 +5116,7 @@ Pièges si on retouche cette zone :
   guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
   court-circuite pas la logique anti-flash.
 
-## Tables Gmail inertes (`gmailAccounts`, `gmailOAuthStates`)
+## Tables Gmail inertes (retirées le 18/09/2026)
 
 La feature « emails du portfolio » (connecteur Gmail OAuth, timeline
 d'emails par participation, page `/emails`) a été **entièrement retirée**
@@ -5124,12 +5124,12 @@ d'emails par participation, page `/emails`) a été **entièrement retirée**
 plutôt que de laisser traîner une version non satisfaisante. Le code reste
 dans l'historique git si besoin de s'en inspirer.
 
-- Les 2 tables ci-dessus restent **déclarées mais inertes** au schéma
-  (même stance que la table legacy `forecasts`) : aucune purge de la
-  donnée prod n'a été faite. Les retirer = purger d'abord, puis resserrer
-  (widen-migrate-narrow) — le chemin qu'ont suivi `companyEmails` et
-  `companyEmailLinks`, vidées puis retirées du schéma le 18/09/2026 (cf.
-  `MIGRATIONS.md` « Purge de l'ancienne timeline d'e-mails »).
+- Les 4 tables de la feature (`gmailAccounts`, `gmailOAuthStates`,
+  `companyEmails`, `companyEmailLinks`) sont restées **déclarées mais
+  inertes** au schéma (même stance que la table legacy `forecasts`) jusqu'au
+  18/09/2026, puis ont été vidées et retirées — purger d'abord, resserrer
+  ensuite (cf. `MIGRATIONS.md` « Purge de l'ancienne timeline d'e-mails » et
+  « Purge des tables inertes »).
 - Le pipeline **reports** (AgentMail → `inboundEmails`) est indépendant et
   reste actif : seules les lignes `inboundEmails` historiques à provenance
   synthétique `gmail:<id>` (ancien pont « Extraire le report ») lisent
@@ -6236,9 +6236,9 @@ mêmes pour lesquelles elle avait été construite. Elle est restée vide, et
 
 - `resolveMemberByEmail` ne lit plus que `users.by_email` : un membre est
   reconnu à son adresse de compte, et à elle seule.
-- La table `userEmailAliases` reste **déclarée mais inerte** au schéma, même
-  stance que la table legacy `forecasts` et les tables Gmail : la retirer
-  demande de purger la prod d'abord, puis de resserrer.
+- La table `userEmailAliases`, restée déclarée mais inerte, a été retirée du
+  schéma le 18/09/2026 (elle était vide — cf. `MIGRATIONS.md` « Purge des
+  tables inertes »).
 - Le reste du raisonnement est inchangé et tient toujours : l'appartenance ne
   décide **pas** si un mail est traité (le contenu s'en charge), elle décide
   **à qui on a le droit de répondre**, l'accusé portant montants,
