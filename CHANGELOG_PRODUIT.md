@@ -62,6 +62,7 @@ de chat :
 >   n'a été appelé ; `ActivityLine` rend `<Shimmer>`.
 > - i18n `chat.json` fr/en : `tool.state*` restaurés (badge du `ToolHeader`),
 >   `tool.calls`, `tool.call`, `tool.details`.
+
 ## v1.240.1 — 18/09/2026 à 18:05 — Ménage : l'ancienne timeline d'e-mails a quitté la base
 
 Les deux tables de l'ancienne timeline d'e-mails, une fonctionnalité retirée
