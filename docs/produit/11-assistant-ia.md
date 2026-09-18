@@ -20,6 +20,14 @@ connecté.
 - **Conversations** : le titre du panneau déroule l'historique des
   conversations (privées à chaque utilisateur et organisation). Bouton +
   pour repartir de zéro, menu pour renommer ou supprimer.
+- **Pendant qu'il travaille**, une ligne au texte à reflet dit ce qu'il fait
+  à l'instant : « Réflexion… », puis « Lecture des participations… »,
+  « Recherche dans les documents… », et de nouveau « Réflexion… » entre deux
+  lectures et jusqu'au premier mot de la réponse. Les lectures faites se rangent dans un bloc replié
+  « 3 sources consultées » : le déplier montre une ligne par source, avec le
+  nombre d'éléments trouvés, et chaque ligne déplie à son tour le détail
+  brut pour qui veut vérifier. Le bloc s'ouvre tout seul quand une action
+  attend votre confirmation.
 - **Réponses en streaming**, bouton Stop, copie d'une réponse, et
   **suggestions contextuelles** sur conversation vide (adaptées à la page :
   pointage, trésorerie, participations…).

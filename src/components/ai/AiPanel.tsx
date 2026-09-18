@@ -21,6 +21,7 @@ import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type { UIMessage } from '@convex-dev/agent/react'
 import type { PromptInputMessage } from '~/components/ai-elements/prompt-input'
+import type { TFunction } from 'i18next'
 import type { ToolPart } from '~/components/ai-elements/tool'
 import {
   Conversation,
@@ -43,21 +44,11 @@ import {
 } from '~/components/ai-elements/prompt-input'
 import { Suggestion } from '~/components/ai-elements/suggestion'
 import {
-  Confirmation,
-  ConfirmationAccepted,
-  ConfirmationAction,
-  ConfirmationActions,
-  ConfirmationRejected,
-  ConfirmationRequest,
-} from '~/components/ai-elements/confirmation'
-import {
-  Tool,
-  ToolContent,
-  ToolHeader,
-  ToolInput,
-  ToolOutput,
-} from '~/components/ai-elements/tool'
-import { getToolRenderer } from '~/components/ai/toolRenderers'
+  ToolGroup,
+  isRunning,
+  toolLabel,
+  toolName,
+} from '~/components/ai/ToolGroup'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -73,7 +64,6 @@ import {
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu'
 import { Input } from '~/components/ui/input'
-import { Spinner } from '~/components/ui/spinner'
 import { cn } from '~/lib/utils'
 
 function errorCode(err: unknown): string {
@@ -85,7 +75,10 @@ function errorCode(err: unknown): string {
   return ''
 }
 
-/** Parts of an assistant message: text (markdown) + tool calls. */
+/**
+ * Parts of an assistant message: markdown text, and the tool calls grouped
+ * into one block per run of consecutive calls (`ToolGroup`).
+ */
 function MessageParts({
   message,
   onRespondApproval,
@@ -97,129 +90,66 @@ function MessageParts({
   /** Approval whose response is being sent (buttons disabled). */
   respondingApprovalId: string | null
 }) {
-  const { t } = useTranslation(['chat'])
-
-  function stateLabel(state: ToolPart['state']): string | undefined {
-    switch (state) {
-      case 'input-streaming':
-        return t('chat:tool.statePending')
-      case 'input-available':
-        return t('chat:tool.stateRunning')
-      case 'approval-requested':
-        return t('chat:tool.stateApprovalRequested')
-      case 'approval-responded':
-        return t('chat:tool.stateApprovalResponded')
-      case 'output-available':
-        return t('chat:tool.stateCompleted')
-      case 'output-denied':
-        return t('chat:tool.stateDenied')
-      case 'output-error':
-        return t('chat:tool.stateError')
-      default:
-        return undefined
+  // Consecutive tool parts merge into one segment; text stays as is.
+  const segments: Array<
+    { kind: 'text'; text: string } | { kind: 'tools'; parts: Array<ToolPart> }
+  > = []
+  for (const part of message.parts) {
+    if (part.type === 'text') {
+      segments.push({ kind: 'text', text: part.text })
+    } else if (isToolPart(part)) {
+      const last = segments.at(-1)
+      if (last?.kind === 'tools') last.parts.push(part)
+      else segments.push({ kind: 'tools', parts: [part] })
     }
   }
-
   return (
     <>
-      {message.parts.map((part, i) => {
-        if (part.type === 'text') {
-          return <MessageResponse key={i}>{part.text}</MessageResponse>
-        }
-        if (part.type === 'dynamic-tool' || part.type.startsWith('tool-')) {
-          const toolPart = part as ToolPart
-          const approvalId = toolPart.approval?.id
-          const responding =
-            approvalId !== undefined && approvalId === respondingApprovalId
-          // Tool name: `tool-listDeals` → `listDeals`; `dynamic-tool` →
-          // `toolName`. A rich renderer shows below the collapsible block
-          // once the tool completed with an output; otherwise the JSON in
-          // the collapsible stands alone (unchanged behavior).
-          const toolName =
-            toolPart.type === 'dynamic-tool'
-              ? toolPart.toolName
-              : toolPart.type.slice('tool-'.length)
-          const Renderer = getToolRenderer(toolName)
-          // The renderer is defensive itself (null on unexpected shape);
-          // the `output-available` state guarantees `output` is present.
-          const rich =
-            Renderer && toolPart.state === 'output-available' ? (
-              <Renderer output={toolPart.output} />
-            ) : null
-          return (
-            <div key={i} className="space-y-2">
-              <Tool className="mb-0">
-                {toolPart.type === 'dynamic-tool' ? (
-                  <ToolHeader
-                    type={toolPart.type}
-                    toolName={toolPart.toolName}
-                    state={toolPart.state}
-                    statusLabel={stateLabel(toolPart.state)}
-                    className="p-2"
-                  />
-                ) : (
-                  <ToolHeader
-                    type={toolPart.type}
-                    state={toolPart.state}
-                    statusLabel={stateLabel(toolPart.state)}
-                    className="p-2"
-                  />
-                )}
-                <ToolContent className="space-y-3 p-3">
-                  {toolPart.input !== undefined && (
-                    <ToolInput
-                      input={toolPart.input}
-                      label={t('chat:tool.parameters')}
-                    />
-                  )}
-                  <Confirmation
-                    approval={toolPart.approval}
-                    state={toolPart.state}
-                  >
-                    <ConfirmationRequest className="text-muted-foreground">
-                      {t('chat:approval.pending')}
-                    </ConfirmationRequest>
-                    <ConfirmationActions>
-                      <ConfirmationAction
-                        disabled={responding}
-                        onClick={() =>
-                          approvalId && onRespondApproval(approvalId, true)
-                        }
-                      >
-                        {t('chat:approval.approve')}
-                      </ConfirmationAction>
-                      <ConfirmationAction
-                        variant="outline"
-                        disabled={responding}
-                        onClick={() =>
-                          approvalId && onRespondApproval(approvalId, false)
-                        }
-                      >
-                        {t('chat:approval.deny')}
-                      </ConfirmationAction>
-                    </ConfirmationActions>
-                    <ConfirmationAccepted className="text-muted-foreground">
-                      {t('chat:approval.accepted')}
-                    </ConfirmationAccepted>
-                    <ConfirmationRejected className="text-muted-foreground">
-                      {t('chat:approval.denied')}
-                    </ConfirmationRejected>
-                  </Confirmation>
-                  <ToolOutput
-                    output={toolPart.output}
-                    errorText={toolPart.errorText}
-                    label={t('chat:tool.result')}
-                    errorLabel={t('chat:tool.error')}
-                  />
-                </ToolContent>
-              </Tool>
-              {rich}
-            </div>
-          )
-        }
-        return null
-      })}
+      {segments.map((seg, i) =>
+        seg.kind === 'text' ? (
+          <MessageResponse key={i}>{seg.text}</MessageResponse>
+        ) : (
+          <div key={i} className="space-y-2">
+            <ToolGroup
+              parts={seg.parts}
+              onRespondApproval={onRespondApproval}
+              respondingApprovalId={respondingApprovalId}
+            />
+          </div>
+        ),
+      )}
     </>
+  )
+}
+
+function isToolPart(part: UIMessage['parts'][number]): part is ToolPart {
+  return part.type === 'dynamic-tool' || part.type.startsWith('tool-')
+}
+
+/**
+ * What the assistant is doing right now, while its message streams: the
+ * running tool's label, otherwise "Réflexion…" (before the first tool, and
+ * after a tool returned — the model may call another one or start writing).
+ * `null` once text is flowing (the text is the indicator) or while a tool
+ * waits for the user.
+ */
+function activityLabel(message: UIMessage, t: TFunction): string | null {
+  const last = [...message.parts]
+    .reverse()
+    .find((p) => p.type === 'text' || isToolPart(p))
+  if (!last) return t('chat:thinking')
+  if (last.type === 'text') return last.text ? null : t('chat:thinking')
+  if (isRunning(last)) return `${toolLabel(t, toolName(last))}…`
+  if (last.state === 'approval-requested') return null
+  return t('chat:thinking')
+}
+
+/** One line of shimmering text: the "something is happening" signal. */
+function ActivityLine({ children }: { children: string }) {
+  return (
+    <span role="status" className="ai-shimmer text-sm">
+      {children}
+    </span>
   )
 }
 
@@ -626,9 +556,13 @@ export function AiPanel({
                           }
                           respondingApprovalId={respondingApprovalId}
                         />
-                        {!m.text && m.status === 'streaming' && (
-                          <span className="text-muted-foreground">…</span>
-                        )}
+                        {m.status === 'streaming' &&
+                          (() => {
+                            const label = activityLabel(m, t)
+                            return label ? (
+                              <ActivityLine>{label}</ActivityLine>
+                            ) : null
+                          })()}
                       </>
                     )}
                   </MessageContent>
@@ -655,10 +589,7 @@ export function AiPanel({
               {thinking && (
                 <Message from="assistant">
                   <MessageContent>
-                    <span className="text-muted-foreground flex items-center gap-2">
-                      <Spinner className="size-3.5" />
-                      {t('chat:thinking')}
-                    </span>
+                    <ActivityLine>{t('chat:thinking')}</ActivityLine>
                   </MessageContent>
                 </Message>
               )}

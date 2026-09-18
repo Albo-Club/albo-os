@@ -1250,8 +1250,13 @@ cette zone :
    fichiers).
 3. **Labels i18n de `tool.tsx`** : les libellés hardcodés anglais upstream
    (Pending/Running/Completed/Parameters/Result) sont exposés en props
-   (`statusLabel`, `label`, `errorLabel`) renseignées par `AiPanel` via
-   `t('chat:tool.*')`. À re-vérifier après une maj du composant.
+   (`statusLabel`, `label`, `errorLabel`) renseignées par
+   `src/components/ai/ToolGroup.tsx` via `t('chat:tool.*')`. Depuis 09/2026
+   le panneau n'utilise plus que `ToolInput` / `ToolOutput` de ce fichier :
+   les appels sont regroupés par `ToolGroup` (un bloc par réponse, libellés
+   humains `chat:tool.labels.*`, garde-fou `tests/toolLabels.test.ts`), pas
+   par `Tool` / `ToolHeader` upstream. À re-vérifier après une maj du
+   composant.
 
 ## Approbation d'outils (panneau AI) — reprise du stream obligatoire
 

@@ -23,6 +23,46 @@ bas de page.
 
 ---
 
+## v1.240.0 — 18/09/2026 à 14:50 — L'assistant montre ce qu'il fait pendant qu'il cherche
+
+Pendant qu'une réponse se construit, le panneau IA affichait le nom
+technique de chaque outil dans une carte à part, et entre deux lectures il
+ne restait que trois points gris. Désormais :
+
+- **Une ligne d'activité** au texte à reflet dit en clair ce que l'assistant
+  fait à l'instant : « Réflexion… », puis « Lecture des participations… »,
+  « Recherche dans les documents… », et de nouveau « Réflexion… » entre deux
+  lectures et jusqu'au premier mot de la réponse. Elle ne disparaît plus en
+  cours de route.
+- **Un seul bloc « N sources consultées »** par réponse remplace la pile de
+  cartes. Replié une fois la réponse finie, il se déplie en une ligne par
+  source, avec son libellé en français et le nombre d'éléments trouvés ; le
+  détail brut reste à un clic de plus. Il s'ouvre tout seul quand une action
+  attend votre confirmation.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/ai/ToolGroup.tsx` (nouveau) : regroupe les tool parts
+>   consécutifs d'un message en un `Collapsible` unique (en-tête spinner /
+>   coche / horloge, ouverture forcée sur `approval-requested`,
+>   `output-error`, `output-denied`), une `ToolRow` par outil (libellé
+>   `chat:tool.labels.<name>` avec repli sur le nom découpé en mots,
+>   compteur générique `resultCount` quand la sortie est une liste, boutons
+>   Confirmer / Refuser hors du contenu repliable) ; les rendus riches de
+>   `toolRenderers.tsx` restent sous le bloc.
+> - `AiPanel.tsx` : `MessageParts` segmente texte / outils ;
+>   `activityLabel` calcule la ligne d'activité pendant `status ===
+>   'streaming'` (dernier tool part en cours → son libellé, sinon
+>   « Réflexion… », rien pendant une approbation) ; le « … » et le `Spinner`
+>   de « Réflexion… » sont remplacés par `ActivityLine` (`.ai-shimmer`,
+>   `src/styles/app.css`, tokens de thème, `prefers-reduced-motion`
+>   respecté). `tool.tsx` n'est plus utilisé que pour `ToolInput` /
+>   `ToolOutput`.
+> - i18n : 67 libellés d'outils fr/en dans `chat.json` (`tool.labels`),
+>   `sources.*`, `tool.items` ; `tests/toolLabels.test.ts`
+>   compare les clés aux exports `*Tools` de `convex/agentTools*.ts` (un
+>   outil sans libellé fait rougir la CI).
+
 ## v1.239.3 — 18/09/2026 à 14:55 — La rotation des sauvegardes fait vraiment le ménage
 
 La sauvegarde quotidienne annonçait depuis dix jours qu'elle purgeait les
