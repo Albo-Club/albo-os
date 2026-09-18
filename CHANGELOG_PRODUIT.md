@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.244.2 — 18/09/2026 à 22:05 — Connecteur Claude : trois champs de plus à compléter
+
+Depuis claude.ai, le connecteur peut désormais compléter sur un deal la
+**quote-part détenue dans le SPV** et le **lien vers la fiche Attio**, et sur
+une société sa **date de création**. Ces trois cases restaient à saisir à la
+main dans l'app (et le lien Attio n'était saisissable nulle part) quand on
+complétait le portefeuille depuis le CRM. Un lien Attio déjà porté par un
+autre deal est refusé, pour ne jamais rendre la synchronisation ambiguë.
+
+> **🔧 Notes techniques**
+>
+> - `convex/agentTools.ts` : `updateDealInternal` accepte `spvOwnershipPct`
+>   (bps) et `attioDealId` (trim, `''` efface, unicité vérifiée sur l'index
+>   `by_attio_deal_id` → `attio_deal_id_already_used`) ;
+>   `updateCompanyInternal` accepte `incorporationDate` (ms).
+> - `convex/mcp/registry.ts` : `updateDeal` expose les deux champs (hors
+>   `dealValueSchema`, partagé avec `createDeal` dont l'interne ne les prend
+>   pas) ; `updateCompany` expose `incorporationDateISO`, converti en ms.
+> - Test `convex/regression.deals.test.ts` (écriture, unicité, effacement,
+>   date de création) ; `TESTING.md` M35 ; `KNOWN_ISSUES.md` § MCP point 7
+>   (seconde exception bloquante).
+
+---
+
 ## v1.244.1 — 18/09/2026 à 21:28 — Un seul ⋯ par page dans Investissements
 
 Le réglage des sous-sections rejoint le menu ⋯ **en haut de la page**, sur la
