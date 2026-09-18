@@ -246,6 +246,49 @@ export const listByGuarantee = query({
   },
 })
 
+/**
+ * A placement's documents (structured-product term sheet, custody agreement,
+ * attestation), most recent first. Reads `by_deal`, never `by_company`:
+ * these rows carry NO `companyId` on purpose. A treasury placement targets
+ * the bank, so filing its documents under a company would pour every
+ * structured-product note onto the bank's own fiche.
+ *
+ * Same projection as `listByLoan` / `listByProperty` / `listByGuarantee`,
+ * for the same reason: they all feed `DocumentsSection`.
+ */
+export const listByDeal = query({
+  args: { dealId: v.id('deals') },
+  handler: async (ctx, { dealId }) => {
+    const deal = await ctx.db.get('deals', dealId)
+    if (!deal) throw new ConvexError('not_found')
+    await requireOrgMember(ctx, deal.orgId)
+
+    const rows = await ctx.db
+      .query('documents')
+      .withIndex('by_deal', (q) => q.eq('dealId', dealId))
+      .order('desc')
+      .take(200)
+
+    return await Promise.all(
+      rows.map(async (doc) => ({
+        _id: doc._id,
+        title: doc.title,
+        kind: doc.kind,
+        period: doc.period ?? null,
+        contentType: doc.contentType ?? null,
+        size: doc.size ?? null,
+        uploadedAt: doc.uploadedAt,
+        ocrState: doc.ocrState ?? null,
+        ocrDetail: doc.ocrDetail ?? null,
+        ocrChars: doc.ocrChars ?? null,
+        vectorState: doc.vectorState ?? null,
+        vectorDetail: doc.vectorDetail ?? null,
+        url: await ctx.storage.getUrl(doc.storageId),
+      })),
+    )
+  },
+})
+
 /** The extracted text of a document — loaded only when the user opens it. */
 export const getExtractedText = query({
   args: { documentId: v.id('documents') },

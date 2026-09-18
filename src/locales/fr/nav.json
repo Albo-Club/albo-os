@@ -118,14 +118,13 @@
     "notFound": "Cette page de documentation n'existe pas."
   },
   "modules": {
-    "activate": "Activer un module",
-    "activated": "{{module}} activé.",
-    "failed": "L'activation a échoué.",
-    "investments": "Investissements",
-    "cash": "Trésorerie",
-    "passif": "Passif",
-    "entreprises": "Entreprises",
-    "placements": "Placements",
-    "immobilier": "Immobilier"
+    "subsections": "Sous-sections",
+    "shown": "{{module}} affiché.",
+    "hidden": "{{module}} masqué.",
+    "failed": "Le réglage n'a pas pu être enregistré.",
+    "blocked": {
+      "content": "contient des données",
+      "last": "la dernière"
+    }
   }
 }

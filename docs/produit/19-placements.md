@@ -121,6 +121,19 @@ et il ne couvre pas toutes les banques. Tant qu'il n'est pas disponible pour
 une banque donnée, l'import de relevé est la façon de tenir ces placements à
 jour.
 
+### Les documents du contrat
+
+La fiche porte enfin un bloc **Documents**, sous les nantissements : on y
+dépose le term sheet d'un produit structuré, la convention de compte, une
+attestation de la banque. Le texte de chaque fichier est lu comme partout
+ailleurs dans l'app, donc une clause devient trouvable à la recherche —
+« quelle est la barrière de protection de l'EMTN ? » n'oblige plus à
+rouvrir le PDF.
+
+Ces documents sont rattachés **au placement seul**, pas à la banque qui le
+tient : la fiche de Natixis Wealth Management ne se remplit pas des notes de
+tous les produits qu'elle abrite.
+
 ### Sous le capot : l'historique des soldes
 
 Chaque mise à jour d'un solde est aussi enregistrée comme une valorisation
@@ -135,7 +148,9 @@ sur la fiche placement, et la base d'une future courbe d'évolution.
 - Un placement alimenté par relevé vaut ce que disait **le dernier relevé
   importé**. Entre deux relevés le chiffre ne bouge pas : c'est voulu, et
   c'est pour ça que la date du document est affichée partout plutôt que
-  celle de l'import.
+  celle de l'import. Passé **90 jours**, l'onglet [À faire](16-a-faire.md)
+  réclame un relevé frais pour cette banque — une seule ligne, quel que soit
+  le nombre de comptes qu'il couvre.
 - **Réimporter le même relevé le corrige**, il ne le double pas : l'app
   range un relevé par date, et un second dépôt à la même date remplace le
   premier. Un relevé d'une autre date ajoute un point à l'historique sans
@@ -154,4 +169,4 @@ sur la fiche placement, et la base d'une future courbe d'évolution.
 - [Entreprises](04-participations.md) (l'autre sous-onglet
   d'Investissements), [Pointage](08-pointage.md) (rattacher les
   versements/retraits), [Trésorerie](07-tresorerie.md) (les comptes
-  bancaires courants)
+  bancaires courants), [À faire](16-a-faire.md) (le rappel de relevé)

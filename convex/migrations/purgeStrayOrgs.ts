@@ -51,7 +51,6 @@ const CONTENT_TABLES = [
   'powensUsers',
   'powensConnections',
   'externalConnections',
-  'vascoConnections',
   'vascoCommunicationsCache',
   'vascoPortfolioIssuers',
   'companies',

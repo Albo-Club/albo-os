@@ -118,14 +118,13 @@
     "notFound": "This documentation page does not exist."
   },
   "modules": {
-    "activate": "Activate a module",
-    "activated": "{{module}} activated.",
-    "failed": "Activation failed.",
-    "investments": "Investments",
-    "cash": "Cash",
-    "passif": "Liabilities",
-    "entreprises": "Companies",
-    "placements": "Placements",
-    "immobilier": "Real estate"
+    "subsections": "Sub-sections",
+    "shown": "{{module}} shown.",
+    "hidden": "{{module}} hidden.",
+    "failed": "Could not save that setting.",
+    "blocked": {
+      "content": "holds data",
+      "last": "the last one"
+    }
   }
 }

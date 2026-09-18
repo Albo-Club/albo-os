@@ -9,6 +9,7 @@ import { getI18n } from '~/lib/i18n'
 import { getLocale } from '~/lib/locale'
 import { cn } from '~/lib/utils'
 import { InvestmentsTabs } from '~/components/investments/InvestmentsTabs'
+import { SubsectionsMenu } from '~/components/investments/SubsectionsMenu'
 import { PropertyDialog } from '~/components/immobilier/PropertyDialog'
 import { usePropertyFormatters } from '~/components/immobilier/formatters'
 import { Badge } from '~/components/ui/badge'
@@ -58,10 +59,13 @@ function Immobilier() {
           <h1 className="text-2xl font-semibold tracking-tight">
             {t('nav:items.investments')}
           </h1>
-          <Button onClick={() => setCreating(true)} disabled={!org}>
-            <Plus className="size-4" />
-            {t('immobilier:create.button')}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setCreating(true)} disabled={!org}>
+              <Plus className="size-4" />
+              {t('immobilier:create.button')}
+            </Button>
+            {org && <SubsectionsMenu orgId={org._id} />}
+          </div>
         </div>
         <InvestmentsTabs
           orgSlug={orgSlug}

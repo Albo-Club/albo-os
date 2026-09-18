@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.239.2 — 18/09/2026 à 22:05 — Connecteur Claude : trois champs de plus à compléter
+## v1.244.2 — 18/09/2026 à 22:05 — Connecteur Claude : trois champs de plus à compléter
 
 Depuis claude.ai, le connecteur peut désormais compléter sur un deal la
 **quote-part détenue dans le SPV** et le **lien vers la fiche Attio**, et sur
@@ -44,6 +44,361 @@ autre deal est refusé, pour ne jamais rendre la synchronisation ambiguë.
 > - Test `convex/regression.deals.test.ts` (écriture, unicité, effacement,
 >   date de création) ; `TESTING.md` M35 ; `KNOWN_ISSUES.md` § MCP point 7
 >   (seconde exception bloquante).
+
+---
+
+## v1.244.1 — 18/09/2026 à 21:28 — Un seul ⋯ par page dans Investissements
+
+Le réglage des sous-sections rejoint le menu ⋯ **en haut de la page**, sur la
+ligne du titre. Posé à droite de la barre d'onglets, il tombait juste sous le
+⋯ des actions de la page sur Entreprises : deux menus identiques empilés dans
+le même coin, sans rien pour dire lequel fait quoi.
+
+Sur **Entreprises**, les trois sous-sections s'ajoutent donc au menu qui
+porte déjà Créer et les exports, sous un séparateur. Sur **Placements** et
+**Immobilier**, dont la ligne de titre n'avait pas de menu, un ⋯ apparaît à
+droite des boutons. Dans les deux cas : un seul ⋯ par page, et plus rien sous
+les onglets.
+
+> **🔧 Notes techniques**
+>
+> - `SubsectionsMenu.tsx` se scinde : `SubsectionsItems` (label + trois
+>   `DropdownMenuCheckboxItem`, à déposer dans n'importe quel
+>   `DropdownMenuContent`) et `SubsectionsMenu` (le même contenu derrière son
+>   propre déclencheur ⋯, pour les pages sans menu).
+> - `InvestmentsTabs` perd son déclencheur et son `ml-auto` ; la barre
+>   d'onglets redevient la seule liste.
+> - `participations.index.tsx` insère `SubsectionsItems` dans son menu
+>   existant ; `placements.index.tsx` et `immobilier.index.tsx` posent
+>   `SubsectionsMenu` dans le cluster de droite de leur ligne de titre
+>   (Immobilier gagne un `flex` autour de son bouton unique).
+> - Le composant lit `api.modules.list` lui-même plutôt que de recevoir
+>   l'état en prop : Convex partage une souscription par (query, args), donc
+>   c'est la même lecture que celle de la barre d'onglets.
+
+## v1.244.0 — 18/09/2026 à 18:47 — La plateforme ne s'active plus, les sous-sections se décochent
+
+**Les quatre entrées de la barre latérale sont désormais toujours là** : À
+faire, Investissements, Trésorerie, Passif, que l'organisation s'en serve ou
+non. Le bouton « Activer un module » disparaît. Une organisation neuve
+s'ouvrait jusqu'ici sur deux entrées et un bouton dont rien ne disait ce
+qu'il contenait ; une entrée absente ne dit rien, alors qu'une page vide dit
+ce qu'elle attend.
+
+**Là où les organisations diffèrent vraiment, c'est à l'intérieur
+d'Investissements** — une SCI détient un immeuble et aucune participation,
+une holding l'inverse. Ses trois sous-sections se règlent donc une par une,
+et le **⋯ passe tout à droite** de la barre d'onglets, séparé de la liste où
+il se lisait comme un débordement.
+
+**Surtout, le réglage marche maintenant dans les deux sens.** Le menu listait
+seulement ce qui était masqué : une fois une sous-section ajoutée, elle
+quittait le menu et plus rien ne permettait de la retirer. Il liste désormais
+les trois avec leur état, et chaque ligne se coche **et se décoche** — on
+affiche Placements pour y créer son premier placement, on masque Immobilier
+si on n'en fera jamais. Au passage, l'onglet ouvert n'est plus proposé comme
+s'il était à ajouter.
+
+Deux lignes refusent d'être décochées, et disent pourquoi : une sous-section
+qui **contient des données** (la masquer emporterait ses lignes) et la
+**dernière affichée** (Investissements doit garder une page à ouvrir). Cette
+seconde règle est aussi ce qui fait qu'une organisation neuve arrive sur
+Entreprises sans avoir rien réglé.
+
+Enfin, l'entrée **Investissements** de la barre latérale ouvre la première
+sous-section affichée : une organisation qui ne fait que de l'immobilier
+atterrit sur Immobilier, et plus sur une page qu'elle avait masquée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/modules.ts` réduit à trois slugs (`entreprises`,
+>   `placements`, `immobilier`) : `SIDEBAR_MODULES` et `activatableModules`
+>   disparaissent, `visibleModules` ne prend plus d'ensemble en argument et
+>   porte le repli (`FALLBACK_MODULE`), nouveau `hideBlockedBy` qui rend
+>   `'content' | 'last' | null`. Le repli tient lieu de défaut : rien à
+>   écrire à la création d'une org, et les orgs vides existantes en
+>   bénéficient sans migration.
+> - `convex/modules.ts` perd les probes `investments` / `cash` / `passif` (et
+>   le helper `byOrg` devenu inutile) ; `setEnabled` refuse ces slugs comme
+>   n'importe quel inconnu, donc une ligne `enabledModules` héritée de
+>   l'ancienne version est inerte — `list` ne lit que `ALL_MODULES`.
+> - Front : `ModuleActivator.tsx` supprimé, remplacé par
+>   `src/components/investments/SubsectionsMenu.tsx`
+>   (`DropdownMenuCheckboxItem`, `onSelect` préventé pour garder le menu
+>   ouvert). `InvestmentsTabs` pousse le ⋯ en `ml-auto`. `AppSidebar` perd le
+>   filtrage par module et la prop `orgId` ; `nav.ts` perd le champ `module`
+>   et expose `SUBSECTION_ROUTES`, que la barre latérale utilise pour
+>   réécrire la cible d'« Investissements ».
+> - i18n : `nav:modules.*` remplacé (`subsections`, `shown`, `hidden`,
+>   `blocked.content`, `blocked.last`) ; les libellés des trois sous-sections
+>   viennent du titre de leur page, plus de doublon.
+> - Tests : `tests/modules.test.ts` et `convex/regression.modules.test.ts`
+>   réécrits sur les nouvelles règles (repli, les deux motifs de refus, la
+>   réversibilité, les slugs de plateforme refusés). `TESTING.md` : table MO
+>   refaite (MO1–MO10).
+## v1.243.2 — 18/09/2026 à 18:55 — Ménage : quatre tables inertes ont quitté la base
+
+Les quatre dernières tables héritées de fonctionnalités retirées (connexion
+Gmail, adresses d'envoi secondaires, anciennes connexions Vasco) ont été
+vidées (7 lignes) puis supprimées. Rien ne change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : retrait de `userEmailAliases`, `gmailAccounts`,
+>   `gmailOAuthStates` et `vascoConnections`, vidées en prod le 18/09/2026
+>   (`MIGRATIONS.md` « Purge des tables inertes »). Reste déclarée : la
+>   table legacy `forecasts`, encore écrite par l'import Airtable.
+> - Supprimés avec les tables : `convex/migrations/purgeInertTables.ts` et
+>   son test, et le one-shot `convex/migrations/externalConnections.ts`
+>   (`migrateVascoConnections`, exécuté, lisait `vascoConnections`) —
+>   `convex/_generated/api.d.ts` régénéré en conséquence.
+>   `purgeStrayOrgs.CONTENT_TABLES` ne cite plus la table.
+> - Docs : `MIGRATIONS.md` (ligne passée en « fait », chantier
+>   `vascoConnections` clos), `KNOWN_ISSUES.md` (sections Gmail, alias,
+>   VASCO API).
+
+## v1.243.1 — 18/09/2026 à 18:40 — Ménage : vider quatre tables inertes
+
+Outil de purge des quatre dernières tables héritées de fonctionnalités
+retirées (connexion Gmail, adresses d'envoi secondaires, anciennes
+connexions Vasco), avant de les retirer de la base. Rien ne change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/purgeInertTables.ts` : une `internalMutation` `run`
+>   avec `dryRun` qui compte puis vide `userEmailAliases`, `gmailAccounts`,
+>   `gmailOAuthStates` et `vascoConnections` — lecture entière par table
+>   (tables minuscules), comptes seulement en retour (deux tables portent des
+>   secrets au repos). Idempotente.
+> - `convex/regression.purgeInertTables.test.ts` : à blanc rien ne bouge,
+>   appliqué tout part, rejeu à zéro.
+> - `MIGRATIONS.md` : la ligne de l'opération (ordre, pas de snapshot
+>   spécifique, PR de suivi qui resserre le schéma).
+## v1.243.0 — 18/09/2026 à 18:27 — L'onglet À faire réclame un relevé de titres quand il vieillit
+
+Quand une banque n'est pas couverte par la connexion bancaire — le cas de
+Natixis Wealth Management — le relevé importé est la **seule** façon dont la
+valeur des comptes-titres entre dans l'app. Passé **90 jours**, l'onglet
+À faire le réclame : « Relevés de titres à renouveler », avec la date du
+dernier relevé et un lien vers les placements.
+
+Trois choix, pour que ce rappel reste un rappel et pas un bruit de fond :
+
+- **Une ligne par banque**, pas par compte. Un relevé Natixis couvre les
+  trois comptes d'un coup ; trois lignes seraient trois rappels pour un seul
+  dépôt.
+- **C'est la date du relevé qui compte**, jamais celle de l'import. Un relevé
+  d'août déposé en novembre a trois mois dans les deux cas.
+- **Une banque dont aucun relevé n'a jamais été importé n'apparaît pas.** Il
+  n'y a rien à renouveler, et un onglet qui crie dès le premier jour s'ignore
+  très vite.
+
+Le bloc se vide tout seul dès qu'un relevé récent est importé.
+
+> **🔧 Notes techniques**
+>
+> - Signal `staleStatements` dans `convex/todo.ts:getTodo`, sur le patron des
+>   cinq autres signaux dérivés : lecture de `statementImports` par `by_org`,
+>   réduction au `statementDate` le plus récent **par `source`**, seuil
+>   `STALE_STATEMENT_MS` (90 j — volontairement plus court que les 18 mois
+>   d'une valorisation immobilière : un compte-titres bouge tous les jours).
+> - Le « déjà importé au moins une fois » est la même règle d'habitude que le
+>   signal des loyers manquants : sans historique, pas de signal.
+> - Section dans `todo.tsx` + clés i18n `todo:staleStatements.*` (fr + en).
+> - `convex/regression.staleStatements.test.ts` (6 cas) : 89 j muet / 91 j
+>   crie, la date du relevé prime sur celle de l'import, seul le relevé le
+>   plus récent est jugé, une ligne quel que soit le nombre de comptes, org
+>   sans import muette, et pas de fuite entre orgs.
+
+---
+
+## v1.242.0 — 18/09/2026 à 18:25 — Les documents d'un placement vivent sur son contrat
+
+La fiche d'un placement porte désormais un bloc **Documents**, sous les
+nantissements — le même que sur un prêt ou un bien immobilier. On y dépose le
+term sheet d'un produit structuré, la convention de compte, une attestation
+de la banque : quatre types proposés (term sheet, juridique, attestation,
+autre), le titre et la date se corrigent après coup, et le texte du fichier
+est lu comme partout ailleurs. Une clause devient donc trouvable à la
+recherche sans rouvrir le PDF.
+
+Le document est rattaché **au placement seul**, pas à la banque qui le tient :
+la fiche de l'établissement ne se remplit pas des notes de tous les produits
+qu'elle abrite. Ajout et retrait apparaissent dans le journal d'activité,
+comme pour n'importe quel document de deal.
+
+> **🔧 Notes techniques**
+>
+> - `documents:listByDeal` (`convex/documents.ts`), calquée sur `listByLoan` :
+>   lecture par `by_deal`, `requireOrgMember` sur l'org du deal, même
+>   projection que les trois autres ancres puisqu'elles alimentent le même
+>   composant.
+> - Front : cas `'deal'` dans `DocumentAnchor` (`AddFilesDialog.tsx`) et
+>   montage de `DocumentsSection` dans `placements.$dealId.tsx` avec
+>   `PLACEMENT_DOC_KINDS`. Clés i18n `documents:placement.*` (fr + en).
+> - Aucun changement de schéma ni de mutation : `documents:create` acceptait
+>   déjà `dealId` comme **seule** ancre (résolution de l'org dans cet ordre :
+>   company, loan, property, deal), l'index `by_deal` existait, et le
+>   journal (`logDealEvent` sur `document_attached` / `document_removed`)
+>   était déjà branché côté deal.
+> - Le document ne porte volontairement **pas** de `companyId` : il reste
+>   donc invisible à l'index `by_company` (il ne remonte pas sur la fiche de
+>   la banque) et, côté RAG, il est indexé dans l'org sans valeur de filtre
+>   `companyId` — trouvable sans filtre, exclu d'une recherche restreinte à
+>   une société.
+
+---
+
+## v1.241.0 — 18/09/2026 à 18:00 — Le fil de recherche de l'assistant, façon AI Elements
+
+Le bloc « sources consultées » livré ce midi restait une carte bordée avec
+une ligne par appel : quarante lectures du même outil faisaient quarante
+lignes et un « 41 sources consultées » qui ne disait rien. Il est refait sur
+les composants d'AI Elements, la bibliothèque de Vercel pour les interfaces
+de chat :
+
+- **Un fil d'étapes** sans bordure : une étape par source, reliées par un
+  trait, l'étape en cours en noir, les faites en gris, le nombre d'éléments
+  en dessous. Loupe pour une lecture, crayon pour une écriture.
+- **L'en-tête porte l'activité** en texte à reflet (« Lecture des
+  valorisations… », « Réflexion… ») tant que la réponse s'écrit, puis le fil
+  se replie tout seul en « 3 sources consultées ».
+- **Une rafale = une étape** : quarante appels du même outil deviennent
+  « Lecture des valorisations · 40 appels ». Le détail brut de chaque appel
+  reste à un clic sous l'étape.
+- Confirmer / Refuser restent dans l'étape concernée, fil ouvert de force.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/ai-elements/chain-of-thought.tsx` et `shimmer.tsx`
+>   vendorisés depuis `vercel/ai-elements` avec les trims documentés dans
+>   `KNOWN_ISSUES.md` (§ Streamdown) : alias `@repo/shadcn-ui` →
+>   `~/components/ui`, `useControllableState` → `useState` local, `motion`
+>   → keyframes `.ai-shimmer` (`src/styles/app.css`, recette à deux couches
+>   de l'upstream, `--spread` par instance).
+> - `ToolGroup.tsx` réécrit : `toSteps` regroupe les appels consécutifs du
+>   même outil, un `ChainOfThoughtStep` par étape (icône `SearchIcon` pour
+>   `list*`/`get*`/`search*`, `PencilIcon` sinon, `SpinnerIcon` en cours,
+>   `XCircleIcon` en erreur), description `calls · items`, un `Tool`
+>   (`ToolHeader` titré « Détails » / « Appel N ») par appel avec sa
+>   `Confirmation`. Prop `live` (message en stream et rien après le groupe) :
+>   l'en-tête porte le `Shimmer`, le bloc est ouvert ; repli automatique via
+>   `useEffect` sur `live || attention`.
+> - `AiPanel.tsx` : `activityLabel` ne parle plus que tant qu'aucun outil
+>   n'a été appelé ; `ActivityLine` rend `<Shimmer>`.
+> - i18n `chat.json` fr/en : `tool.state*` restaurés (badge du `ToolHeader`),
+>   `tool.calls`, `tool.call`, `tool.details`.
+
+## v1.240.1 — 18/09/2026 à 18:05 — Ménage : l'ancienne timeline d'e-mails a quitté la base
+
+Les deux tables de l'ancienne timeline d'e-mails, une fonctionnalité retirée
+de l'app depuis des mois, ont été vidées (65 messages, 78 rattachements)
+puis supprimées, et leurs 29 pièces jointes libérées du stockage. Rien ne
+change à l'écran.
+
+> **🔧 Notes techniques**
+>
+> - `convex/schema.ts` : retrait de `companyEmails` et `companyEmailLinks`,
+>   vidées en prod le 18/09/2026 (`MIGRATIONS.md` « Purge de l'ancienne
+>   timeline d'e-mails ») ; `gmailAccounts` / `gmailOAuthStates` restent
+>   déclarées, à traiter de la même façon (purger, puis resserrer).
+> - Audit du stockage : `storageAudit.scanHolders`,
+>   `scripts/lib/storage-holders.mjs` et le docstring de `storagePurge.ts`
+>   passent de six à cinq champs porteurs (quatre vrais porteurs) ;
+>   `KNOWN_ISSUES.md` mis à jour au même compte.
+> - Les cinq migrations CALTE déjà exécutées (`mergeBillivCalte`,
+>   `reassignClimateHouseCofoDeals`, `cleanupCalteOrphanCompanies`,
+>   `cleanupCalteImport`, `archiveCalteBlockedCards`) ne comptent plus les
+>   lignes `companyEmailLinks` avant d'archiver ou de fusionner une fiche —
+>   contrôle sans objet sur une table qui n'existe plus, noté en commentaire.
+> - Supprimés avec les tables : `convex/migrations/purgeCompanyEmails.ts`,
+>   `scripts/purge-company-emails.mjs` et
+>   `convex/regression.purgeCompanyEmails.test.ts`.
+
+## v1.240.0 — 18/09/2026 à 14:50 — L'assistant montre ce qu'il fait pendant qu'il cherche
+
+Pendant qu'une réponse se construit, le panneau IA affichait le nom
+technique de chaque outil dans une carte à part, et entre deux lectures il
+ne restait que trois points gris. Désormais :
+
+- **Une ligne d'activité** au texte à reflet dit en clair ce que l'assistant
+  fait à l'instant : « Réflexion… », puis « Lecture des participations… »,
+  « Recherche dans les documents… », et de nouveau « Réflexion… » entre deux
+  lectures et jusqu'au premier mot de la réponse. Elle ne disparaît plus en
+  cours de route.
+- **Un seul bloc « N sources consultées »** par réponse remplace la pile de
+  cartes. Replié une fois la réponse finie, il se déplie en une ligne par
+  source, avec son libellé en français et le nombre d'éléments trouvés ; le
+  détail brut reste à un clic de plus. Il s'ouvre tout seul quand une action
+  attend votre confirmation.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/ai/ToolGroup.tsx` (nouveau) : regroupe les tool parts
+>   consécutifs d'un message en un `Collapsible` unique (en-tête spinner /
+>   coche / horloge, ouverture forcée sur `approval-requested`,
+>   `output-error`, `output-denied`), une `ToolRow` par outil (libellé
+>   `chat:tool.labels.<name>` avec repli sur le nom découpé en mots,
+>   compteur générique `resultCount` quand la sortie est une liste, boutons
+>   Confirmer / Refuser hors du contenu repliable) ; les rendus riches de
+>   `toolRenderers.tsx` restent sous le bloc.
+> - `AiPanel.tsx` : `MessageParts` segmente texte / outils ;
+>   `activityLabel` calcule la ligne d'activité pendant `status ===
+>   'streaming'` (dernier tool part en cours → son libellé, sinon
+>   « Réflexion… », rien pendant une approbation) ; le « … » et le `Spinner`
+>   de « Réflexion… » sont remplacés par `ActivityLine` (`.ai-shimmer`,
+>   `src/styles/app.css`, tokens de thème, `prefers-reduced-motion`
+>   respecté). `tool.tsx` n'est plus utilisé que pour `ToolInput` /
+>   `ToolOutput`.
+> - i18n : 67 libellés d'outils fr/en dans `chat.json` (`tool.labels`),
+>   `sources.*`, `tool.items` ; `tests/toolLabels.test.ts`
+>   compare les clés aux exports `*Tools` de `convex/agentTools*.ts` (un
+>   outil sans libellé fait rougir la CI).
+
+## v1.239.3 — 18/09/2026 à 14:55 — La rotation des sauvegardes fait vraiment le ménage
+
+La sauvegarde quotidienne annonçait depuis dix jours qu'elle purgeait les
+archives trop anciennes du Drive, sans que rien ne parte : le dossier
+grossissait d'une archive par jour. Les archives hors rotation sont
+désormais mises à la corbeille du Drive partagé (vidée automatiquement au
+bout de 30 jours), et le run vérifie que l'action a bien eu lieu au lieu de
+le supposer. Rien de visible dans l'app.
+
+> **🔧 Notes techniques**
+>
+> - `scripts/convex-backup.mjs` : `deleteArchive` (`DELETE`, réservé au rôle
+>   Gestionnaire sur un Drive partagé — le compte de service est Gestionnaire
+>   de contenu) remplacé par `trashArchive` (`PATCH { trashed: true }` avec
+>   `fields=trashed`, réponse contrôlée, 404 loggé « introuvable, ignorée » et
+>   non compté). Le résumé de fin de run compte les mises à la corbeille
+>   réelles.
+> - `KNOWN_ISSUES.md` : nouvelle section « Un Gestionnaire de contenu ne
+>   supprime pas sur un Drive partagé » ; `MIGRATIONS.md` (étape 3 du runbook :
+>   ne pas monter le compte en Gestionnaire, vérifier la corbeille) ;
+>   `TESTING.md` B12.
+
+## v1.239.2 — 18/09/2026 à 14:50 — Ménage : vider l'ancienne timeline d'e-mails
+
+Outil interne, rien de visible dans l'app. Une ancienne fonctionnalité de
+timeline d'e-mails, retirée depuis longtemps, gardait encore ses messages et
+leurs pièces jointes dans la base. Une opération à lancer une fois les vide ;
+les pièces jointes devenues orphelines partent ensuite avec l'outil de purge
+existant, et les deux tables quitteront la structure de la base dans la
+foulée.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/purgeCompanyEmails.ts` : `scanPage` (comptage paginé,
+>   borné à 4 Mio par `maximumBytesRead` — une ligne porte son corps) et
+>   `purgeBatch` (supprime la première page d'une table, `isDone` dit s'il en
+>   reste). Tables `companyEmails` et `companyEmailLinks` seulement.
+> - `scripts/purge-company-emails.mjs` : à blanc par défaut (lignes par
+>   table), `--apply` vide la jointure puis les messages. Fonctions feuilles,
+>   pas d'auto-référence `internal.*`.
+> - `convex/regression.purgeCompanyEmails.test.ts` (2 cas via `anyApi`).
+> - Runbook dans `MIGRATIONS.md` : snapshot **complet** avant (des fichiers
+>   seront effacés par `storage-purge` derrière), puis PR de suivi qui retire
+>   les tables du schéma et des outils d'audit.
 
 ## v1.239.1 — 18/09/2026 à 13:50 — Ménage : l'ancienne copie du texte des documents a disparu
 

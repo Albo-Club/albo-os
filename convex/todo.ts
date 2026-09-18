@@ -22,6 +22,14 @@ const DONE_VISIBLE_MS = 30 * 24 * 60 * 60 * 1000
 const STALE_VALUATION_MS = 18 * 30 * 24 * 60 * 60 * 1000
 
 /**
+ * A securities statement is considered stale past this. Shorter than a
+ * property's 18 months on purpose: a building is revalued once in a while,
+ * a securities account moves every day, and the statement is the ONLY way
+ * its value enters the app when the bank is not covered by the bank feed.
+ */
+const STALE_STATEMENT_MS = 90 * 24 * 60 * 60 * 1000
+
+/**
  * Months since year 0, UTC — a total order over calendar months, so « the
  * month before » never has to worry about December.
  */
@@ -235,6 +243,38 @@ export const getTodo = query({
     // Longest silence first.
     missingRents.sort((a, b) => a.lastRentAt - b.lastRentAt)
 
+    // ── Securities statements getting old ─────────────────────────────────
+    // One line per statement READER, not per account: a Natixis statement
+    // covers the three accounts at once, so three lines would be three
+    // reminders for one upload.
+    //
+    // Only an org that HAS already imported one is judged — the same
+    // « habit » rule as the rents above. An org that never imported has no
+    // statement to renew, and a signal that fires on every org from day one
+    // teaches people to ignore the tab.
+    const imports = await ctx.db
+      .query('statementImports')
+      .withIndex('by_org', (q) => q.eq('orgId', orgId))
+      .collect()
+    const latestBySource = new Map<string, Doc<'statementImports'>>()
+    for (const row of imports) {
+      const seen = latestBySource.get(row.source)
+      if (!seen || row.statementDate > seen.statementDate) {
+        latestBySource.set(row.source, row)
+      }
+    }
+    const staleStatements = [...latestBySource.values()]
+      .filter((row) => now - row.statementDate > STALE_STATEMENT_MS)
+      .map((row) => ({
+        source: row.source,
+        bankName: row.bankName,
+        // The STATEMENT's date, never the import's: a statement drawn in
+        // August and uploaded in November is three months old either way.
+        lastStatementDate: row.statementDate,
+      }))
+    // Oldest first, like the other « it has waited » signals.
+    staleStatements.sort((a, b) => a.lastStatementDate - b.lastStatementDate)
+
     // ── Manual tasks ──────────────────────────────────────────────────────
     // Done tasks older than DONE_VISIBLE_MS are hidden (not deleted). Within
     // a status group the UI keeps this order: due date first, then newest.
@@ -273,6 +313,7 @@ export const getTodo = query({
       overdueInstalments: overdueInstalmentsPreview,
       staleValuations,
       missingRents,
+      staleStatements,
       tasks: tasks.map((task: Doc<'todos'>) => ({
         _id: task._id,
         title: task.title,

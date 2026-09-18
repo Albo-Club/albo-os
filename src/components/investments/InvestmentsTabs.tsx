@@ -3,17 +3,21 @@ import { useConvexQuery } from '@convex-dev/react-query'
 import { useTranslation } from 'react-i18next'
 
 import { api } from '../../../convex/_generated/api'
-import { TAB_MODULES, isVisible } from '../../../convex/lib/modules'
+import { ALL_MODULES, visibleModules } from '../../../convex/lib/modules'
 import type { Id } from '../../../convex/_generated/dataModel'
-import type { TabModule } from '../../../convex/lib/modules'
-import { ModuleActivator } from '~/components/app-shell/ModuleActivator'
+import type { ModuleKey } from '../../../convex/lib/modules'
 
 /**
  * Shared sub-nav of the Investissements section: three router links
  * switching between the Entreprises (participations), Placements and
  * Immobilier pages. Real estate is a TAB here and not a sidebar entry: a
  * property would distort the TVPI/MOIC of the portfolio if it sat under
- * Entreprises (SPEC D28), but it is still an investment. Styled
+ * Entreprises (SPEC D28), but it is still an investment.
+ *
+ * Which of the three are on screen is the org's own choice, made from the
+ * page's own ⋯ on the title row (`SubsectionsMenu`) — not from a trigger of
+ * its own here, which put two identical ⋯ one under the other in the same
+ * corner. Styled
  * exactly like the shadcn TabsList/TabsTrigger default variant from
  * `~/components/ui/tabs` — but built from `Link`s with a `data-state`
  * attribute, since these are navigation tabs (the active one is derived
@@ -31,7 +35,7 @@ export function InvestmentsTabs({
   orgId,
 }: {
   orgSlug: string
-  active: TabModule
+  active: ModuleKey
   /** Absent = every tab is shown (no org resolved yet). */
   orgId?: Id<'organizations'>
 }) {
@@ -41,14 +45,12 @@ export function InvestmentsTabs({
     orgId ? { orgId } : 'skip',
   )
 
-  // A tab that holds nothing is hidden (SPEC D37) — but the one being looked
-  // at never is: hiding the page you are on would be a trapdoor. While the
-  // query is in flight everything shows, so tabs never flicker away.
-  const shows = (tab: TabModule) => {
-    if (tab === active || !modules) return true
-    const state = modules.find((row) => row.key === tab)
-    return state ? isVisible(state) : true
-  }
+  // A sub-section that holds nothing and was not ticked is hidden (SPEC
+  // D37) — but the one being looked at never is: hiding the page you are on
+  // would be a trapdoor. While the query is in flight everything shows, so
+  // tabs never flicker away.
+  const visible = new Set(modules ? visibleModules(modules) : ALL_MODULES)
+  const shows = (tab: ModuleKey) => tab === active || visible.has(tab)
 
   return (
     <div className="flex items-center gap-2">
@@ -85,16 +87,6 @@ export function InvestmentsTabs({
           </Link>
         ) : null}
       </div>
-      {/* Brings back a hidden tab — indispensable, since that is exactly
-          where its first element gets created (SPEC D37). */}
-      {orgId ? (
-        <ModuleActivator
-          orgId={orgId}
-          states={modules}
-          among={TAB_MODULES}
-          variant="tabs"
-        />
-      ) : null}
     </div>
   )
 }

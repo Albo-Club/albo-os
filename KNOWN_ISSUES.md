@@ -1245,13 +1245,22 @@ cette zone :
    `@streamdown/{code,math,mermaid,cjk}` (Shiki + KaTeX + Mermaid = des Mo
    de bundle). On les a retirés (le core garde le GFM : tableaux, listes).
    Idem `tool.tsx` : le `CodeBlock` upstream (Shiki) est remplacé par un
-   `<pre>` local. **Toute réinstallation/maj depuis le registry AI Elements
-   doit re-appliquer ces deux trims** (commentaires en place dans les
-   fichiers).
+   `<pre>` local. `shimmer.tsx` : upstream anime avec `motion/react` (qu'on
+   ne ship pas) — le nôtre garde la même recette de fond à deux couches
+   mais l'anime par les keyframes `.ai-shimmer` de `src/styles/app.css`.
+   `chain-of-thought.tsx` : `useControllableState` (paquet Radix absent)
+   remplacé par un `useState` contrôlé/non contrôlé local. **Toute
+   réinstallation/maj depuis le registry AI Elements doit re-appliquer ces
+   trims** (commentaires en place dans les fichiers).
 3. **Labels i18n de `tool.tsx`** : les libellés hardcodés anglais upstream
    (Pending/Running/Completed/Parameters/Result) sont exposés en props
-   (`statusLabel`, `label`, `errorLabel`) renseignées par `AiPanel` via
-   `t('chat:tool.*')`. À re-vérifier après une maj du composant.
+   (`statusLabel`, `label`, `errorLabel`) renseignées par
+   `src/components/ai/ToolGroup.tsx` via `t('chat:tool.*')`. Depuis 09/2026
+   les appels sont regroupés par `ToolGroup` dans un `ChainOfThought` (une
+   étape par outil, libellés humains `chat:tool.labels.*`, garde-fou
+   `tests/toolLabels.test.ts`) ; `Tool` / `ToolHeader` ne servent plus qu'au
+   détail d'un appel sous son étape. À re-vérifier après une maj du
+   composant.
 
 ## Approbation d'outils (panneau AI) — reprise du stream obligatoire
 
@@ -4599,9 +4608,9 @@ pas en double.
   one row per client × org), managed by the connections core
   (`convex/connections.ts` + registry `convex/lib/connectors.ts`), never
   returned to the client (same rule as `powensUsers`). The legacy
-  `vascoConnections` table is declared-but-inert after the one-shot
-  `migrations/externalConnections:migrateVascoConnections` (cf.
-  `MIGRATIONS.md`).
+  `vascoConnections` table was copied over by a one-shot
+  (`migrateVascoConnections`), then purged and dropped from the schema on
+  18/09/2026 (cf. `MIGRATIONS.md` « Purge des tables inertes »).
 
 ### The investor-scoping trap (this cost the reverse-engineering)
 
@@ -5110,7 +5119,7 @@ Pièges si on retouche cette zone :
   guards — le préchargement ne fait qu'accélérer `useConvexAuth()`, il ne
   court-circuite pas la logique anti-flash.
 
-## Tables Gmail inertes (`gmailAccounts`, `gmailOAuthStates`, `companyEmails`, `companyEmailLinks`)
+## Tables Gmail inertes (retirées le 18/09/2026)
 
 La feature « emails du portfolio » (connecteur Gmail OAuth, timeline
 d'emails par participation, page `/emails`) a été **entièrement retirée**
@@ -5118,10 +5127,12 @@ d'emails par participation, page `/emails`) a été **entièrement retirée**
 plutôt que de laisser traîner une version non satisfaisante. Le code reste
 dans l'historique git si besoin de s'en inspirer.
 
-- Les 4 tables ci-dessus restent **déclarées mais inertes** au schéma
-  (même stance que la table legacy `forecasts`) : aucune purge de la
-  donnée prod n'a été faite. Les retirer = purger d'abord, puis resserrer
-  (widen-migrate-narrow).
+- Les 4 tables de la feature (`gmailAccounts`, `gmailOAuthStates`,
+  `companyEmails`, `companyEmailLinks`) sont restées **déclarées mais
+  inertes** au schéma (même stance que la table legacy `forecasts`) jusqu'au
+  18/09/2026, puis ont été vidées et retirées — purger d'abord, resserrer
+  ensuite (cf. `MIGRATIONS.md` « Purge de l'ancienne timeline d'e-mails » et
+  « Purge des tables inertes »).
 - Le pipeline **reports** (AgentMail → `inboundEmails`) est indépendant et
   reste actif : seules les lignes `inboundEmails` historiques à provenance
   synthétique `gmail:<id>` (ancien pont « Extraire le report ») lisent
@@ -5988,6 +5999,41 @@ backup, réplication, audit), regarder ce qu'il **lit** et non ce qu'il écrit
 
 ---
 
+## Un Gestionnaire de contenu ne supprime pas sur un Drive partagé — et le run reste vert
+
+Sur un Drive partagé, l'appel `files.delete` de l'API Drive (suppression
+définitive, sans passage par la corbeille) est réservé au rôle
+**Gestionnaire** (`organizer`). Le compte de service du backup est
+**Gestionnaire de contenu** (`fileOrganizer`), le rôle minimal pour écrire
+dans le dossier — et le bon : Gestionnaire donne aussi le droit de gérer les
+membres et de supprimer le Drive entier.
+
+Le cas vécu (9 → 18 septembre 2026) : `scripts/convex-backup.mjs` purgeait
+avec `DELETE`, et traitait un 404 comme « déjà partie » sans rien dire. Avec
+ce rôle, Drive ne répond ni par une erreur qui arrête le script ni par une
+suppression : dix runs verts de suite ont écrit `purgée : …` sur les mêmes
+archives, et le dossier n'a jamais maigri. Deux runs le même jour ont
+« purgé » exactement les quatre mêmes fichiers — c'est ce doublon dans les
+logs qui a révélé le no-op, pas une erreur.
+
+Ce que fait le script depuis :
+
+- il **met à la corbeille** (`PATCH { trashed: true }`), geste permis à un
+  Gestionnaire de contenu. Google vide la corbeille d'un Drive partagé après
+  30 jours, donc l'archive disparaît quand même — avec un mois pour rattraper
+  une rotation fausse. Le listing du script filtre déjà `trashed = false`,
+  donc une archive corbeillée sort de la rotation dès le run suivant ;
+- il **vérifie la réponse** : `fields=trashed` fait renvoyer l'état résultant,
+  et un 2xx qui ne dit pas `trashed: true` est une erreur, pas un succès ;
+- un 404 est loggé « introuvable, ignorée » et n'entre pas dans le compte des
+  archives purgées.
+
+Le réflexe général : quand une API peut répondre « OK » sans avoir agi
+(permission manquante côté ressource, no-op silencieux), demander l'état
+résultant dans la réponse et le comparer — un code HTTP ne prouve rien. Et
+un message de succès qui se répète à l'identique d'un run à l'autre est le
+signe d'une action sans effet.
+
 ## Le composant RAG garde chaque version remplacée
 
 `@convex-dev/rag` ne supprime **jamais** une entrée de lui-même. Ré-ajouter
@@ -6193,9 +6239,9 @@ mêmes pour lesquelles elle avait été construite. Elle est restée vide, et
 
 - `resolveMemberByEmail` ne lit plus que `users.by_email` : un membre est
   reconnu à son adresse de compte, et à elle seule.
-- La table `userEmailAliases` reste **déclarée mais inerte** au schéma, même
-  stance que la table legacy `forecasts` et les tables Gmail : la retirer
-  demande de purger la prod d'abord, puis de resserrer.
+- La table `userEmailAliases`, restée déclarée mais inerte, a été retirée du
+  schéma le 18/09/2026 (elle était vide — cf. `MIGRATIONS.md` « Purge des
+  tables inertes »).
 - Le reste du raisonnement est inchangé et tient toujours : l'appartenance ne
   décide **pas** si un mail est traité (le contenu s'en charge), elle décide
   **à qui on a le droit de répondre**, l'accusé portant montants,
@@ -6923,30 +6969,28 @@ les blobs qu'à `documents` — d'où une colonne « (aucune ligne documents) »
 facile à lire comme « personne ne s'en sert, on peut supprimer ». C'est faux, et
 le croire coûte une pièce jointe perdue.
 
-**Six** champs du schéma pointent sur `_storage` :
+**Cinq** champs du schéma pointent sur `_storage` :
 
 | Table | Champ | Nature |
 | --- | --- | --- |
 | `documents` | `storageId` | le document d'une fiche |
 | `inboundEmails` | `attachments[].storageId` | pièce jointe reçue (optionnel : le fichier peut n'avoir jamais été rangé) |
-| `companyEmails` | `attachments[].storageId` | **timeline email RETIRÉE** — table inerte, plus lue par rien, mais ses fichiers sont toujours là |
 | `users` | `avatarStorageId` | avatar |
 | `organizations` | `logoStorageId` | logo |
 | `documentTexts` | `storageId` | **pas un porteur** — le texte extrait DU blob, donc jamais une raison de le garder ; il part avec lui |
 
 Une pièce jointe de mail jamais promue en document est donc parfaitement
 utilisée **et** invisible à la jointure `documents`. Le critère de suppression
-est « aucun des cinq vrais porteurs », pas « pas de ligne `documents` ».
+est « aucun des quatre vrais porteurs », pas « pas de ligne `documents` ».
 
 **Corollaire, et c'est le vrai piège** : `releaseStorage`
 (`convex/lib/documentBlobs.ts`) ne vérifie que `documents` **plus le seul mail
-qu'on lui passe en argument**. Il ignore `companyEmails`, les avatars, les logos
-et les autres lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux
-transferts du même fichier produisent deux blobs distincts, pas un blob partagé,
-et la timeline retirée ne partage rien avec les documents — mais **une purge en
-masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des cinq
-porteurs elle-même. Le jour où un chemin fera vraiment partager un blob entre
-deux mails, le refcount le ratera.
+qu'on lui passe en argument**. Il ignore les avatars, les logos et les autres
+lignes `inboundEmails`. C'est sans conséquence aujourd'hui — deux transferts du
+même fichier produisent deux blobs distincts, pas un blob partagé — mais **une
+purge en masse ne doit pas s'appuyer dessus** : elle doit refaire le tour des
+quatre porteurs elle-même. Le jour où un chemin fera vraiment partager un blob
+entre deux mails, le refcount le ratera.
 
 Mesure : `node scripts/storage-audit.mjs`, section « Qui référence les
 fichiers ». Classement pur et testé dans `scripts/lib/storage-holders.mjs`
@@ -6999,7 +7043,7 @@ facture qui monte. Deux réflexes :
 Le contrôle de réclamation se limite ici à `documents`, et c'est délibéré :
 l'id du blob naît dans l'action et n'est rendu à personne, donc aucun mail,
 avatar ni logo ne peut le désigner. Une purge en masse, elle, doit bien faire
-le tour des cinq porteurs — cf. la section « Aucune ligne `documents` ne veut
+le tour des quatre porteurs — cf. la section « Aucune ligne `documents` ne veut
 pas dire fichier orphelin ».
 
 ---

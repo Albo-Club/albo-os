@@ -40,6 +40,7 @@ const MAX_BYTES = 20 * 1024 * 1024 // project storage cap (cf. convex/files.ts)
  * a tenancy hole (cf. `CLAUDE.md`). */
 export type DocumentAnchor =
   | { kind: 'company'; companyId: Id<'companies'> }
+  | { kind: 'deal'; dealId: Id<'deals'> }
   | { kind: 'loan'; loanId: Id<'loans'> }
   | { kind: 'property'; propertyId: Id<'properties'> }
   | { kind: 'guarantee'; guaranteeId: Id<'guarantees'> }
@@ -49,6 +50,9 @@ function anchorArgs(anchor: DocumentAnchor) {
   switch (anchor.kind) {
     case 'company':
       return { companyId: anchor.companyId }
+    // Deal alone, with no `companyId`: see `documents:listByDeal`.
+    case 'deal':
+      return { dealId: anchor.dealId }
     case 'loan':
       return { loanId: anchor.loanId }
     case 'property':

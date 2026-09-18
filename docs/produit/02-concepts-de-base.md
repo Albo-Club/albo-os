@@ -69,35 +69,45 @@ Quelques conventions traversent toute l'application :
 - **Assistant IA** (⌘J) : panneau latéral droit persistant, décrit dans
   [Assistant IA](11-assistant-ia.md).
 
-## Les modules qui s'affichent
+## Les sous-sections d'Investissements
 
-Toutes les organisations ne font pas la même chose. Une SCI qui détient un
-immeuble n'a ni participation ni placement ; une holding d'investissement n'a
-pas de bien.
+La barre latérale ne se règle pas : **À faire, Investissements, Trésorerie et
+Passif y sont toujours**, que l'organisation s'en serve ou non. Une entrée
+absente ne dit rien ; une page vide, elle, dit ce qu'elle attend — et c'est ce
+dont on a besoin quand on découvre l'outil.
 
-Un module **s'affiche s'il contient quelque chose**. Rien n'est à déclarer :
-la première ligne créée le fait apparaître, et l'application le vérifie à
-chaque affichage plutôt que de garder un réglage à maintenir.
+Là où les organisations diffèrent vraiment, c'est **à l'intérieur
+d'Investissements**. Une SCI qui détient un immeuble n'a ni participation ni
+placement ; une holding d'investissement n'a pas de bien. Ses trois
+sous-sections — Entreprises, Placements, Immobilier — se règlent donc une par
+une, depuis le **menu ⋯ en haut de la page**, sur la ligne du titre : celui
+qui porte déjà les actions de la page sur Entreprises, et un menu à lui à
+côté des boutons sur Placements et Immobilier.
 
-Cela vaut pour les entrées de la barre latérale (Investissements, Trésorerie,
-Passif) **et** pour les trois sous-onglets d'Investissements.
+Le menu liste les trois avec leur état, et chaque ligne **se coche et se
+décoche** : on affiche une sous-section pour y créer son premier élément, on
+masque celle dont on ne se servira jamais. Une sous-section **s'affiche aussi
+d'elle-même** dès qu'elle contient quelque chose : la première ligne créée la
+fait apparaître, sans rien à déclarer.
 
-Reste le problème de l'œuf et de la poule : si un module vide est masqué,
-comment y créer son premier élément ? D'où le bouton **« Activer un
-module »** en bas de la barre latérale, et le **⋯** à côté des sous-onglets.
-Ils listent ce qui est masqué et le ramènent d'un clic — le module reste
-alors visible même vide, le temps d'y créer quelque chose.
+Trois garde-fous :
 
-Deux garde-fous :
+- **Une sous-section qui contient des lignes ne peut pas être masquée.** Le
+  contenu l'emporte : des lignes existantes ne doivent jamais devenir
+  inaccessibles. Le menu le dit sur la ligne concernée.
+- **La dernière affichée ne peut pas être masquée** non plus — Investissements
+  doit garder une page à ouvrir. C'est aussi ce qui fait qu'une organisation
+  neuve arrive sur Entreprises sans avoir rien réglé.
+- **L'onglet ou la page consultée ne se masque jamais**, même si la
+  sous-section vient de se vider. Se retrouver sur une page dont l'onglet a
+  disparu serait une trappe.
 
-- **Éteindre un module qui contient des lignes ne les cache pas.** Le contenu
-  l'emporte : des lignes existantes ne doivent jamais devenir inaccessibles.
-- **L'onglet ou la page consultée ne se masque jamais**, même si le module
-  vient de se vider. Se retrouver sur une page dont l'onglet a disparu serait
-  une trappe.
+L'entrée **Investissements** de la barre latérale ouvre la première
+sous-section affichée : une organisation qui ne fait que de l'immobilier
+atterrit sur Immobilier, pas sur une page qu'elle a masquée.
 
-**« À faire » ne se masque pas** : c'est là que remontent les signaux de tous
-les autres modules.
+Le réglage appartient à l'organisation — il est le même mécanisme partout,
+seul le choix diffère d'une organisation à l'autre.
 
 ## Pages liées
 

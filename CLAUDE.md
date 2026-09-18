@@ -920,6 +920,18 @@ export const remove = mutation({
   (pointage, prévisionnel, suppressions restent hors MCP) — c'est l'absence
   de décision qui ne l'est pas. Le portage est un wrapper sur l'internal
   existant : jamais une seconde implémentation.
+- ❌ Un réglage dont l'UI n'écrit qu'**une** des deux valeurs. `modules.setEnabled`
+  acceptait `false` depuis le premier jour, et le menu ⋯ n'a jamais listé que
+  les sections **masquées** en n'écrivant que `true` : on ajoutait une
+  section, et plus rien ne permettait de la retirer. Le chemin de retour
+  existait en base ; personne ne l'avait branché. Le test est mécanique :
+  pour chaque mutation à deux états, chercher l'appelant qui écrit l'autre
+  valeur — s'il n'existe pas, c'est un aller simple, et l'utilisateur le
+  découvre après le clic. Corollaire de forme : un menu qui ne liste que ce
+  qui est **absent** ne peut pas, par construction, servir à enlever. Lister
+  les deux états avec leur case à cocher est ce qui rend le geste réversible,
+  et chaque refus de décocher se dit sur sa ligne (« contient des données »,
+  « la dernière ») au lieu de faire disparaître l'option.
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).
