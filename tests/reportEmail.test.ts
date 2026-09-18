@@ -17,6 +17,7 @@ import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import { reportConfirmationHtml } from '../convex/emailTemplates'
 import type { ReportConfirmationData } from '../convex/emailTemplates'
+import type { ScoreEvolution } from '../convex/lib/scoreEvolution'
 
 /** A synthesis whose texts are as long as the model realistically makes them. */
 const HOSTILE: ReportConfirmationData = {
@@ -34,6 +35,7 @@ const HOSTILE: ReportConfirmationData = {
       synthesis: {
         score: 7,
         scoreLabel: 'En bonne voie',
+        evolution: { previousScore: 6, previousReportLabel: 'Décembre 2025' },
         summary: 'Création de la holding Estime, détenant 100% d\'Auxicare.',
         goodPoints: ['Holding Estime', 'Antler CE au capital', 'Risque diversifié'],
         badPoints: ['Aucun chiffre financier reporté'],
@@ -70,6 +72,19 @@ describe('reportConfirmationHtml', () => {
     // Short figure stays big, long sentence shrinks.
     assert.match(html, /font-size:21px;font-weight:600;[^"]*">86k€/)
     assert.match(html, /font-size:15px;font-weight:600;[^"]*">Holding Estime/)
+  })
+
+  it('says where the score comes from, under the verdict (ALB-252)', () => {
+    assert.match(html, /↑ Avant&nbsp;: 6\/10 · Décembre 2025/)
+    const same = (evolution: ScoreEvolution | undefined) =>
+      reportConfirmationHtml({
+        ...HOSTILE,
+        entities: [{ ...HOSTILE.entities[0], synthesis: { ...HOSTILE.entities[0].synthesis!, evolution } }],
+      })
+    assert.match(same({ previousScore: 7, previousReportLabel: 'Q3 2025' }), /→ Inchangée · Q3 2025/)
+    assert.match(same({ previousScore: 9 }), /↓ Avant&nbsp;: 9\/10</)
+    assert.match(same({ previousScore: null }), /Première note/)
+    assert.doesNotMatch(same(undefined), /Avant&nbsp;:|Inchangée|Première note/)
   })
 
   it('expresses every alignment in CSS, not only in the valign attribute', () => {
