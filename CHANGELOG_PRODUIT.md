@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.241.0 — 18/09/2026 à 18:22 — Les documents d'un placement vivent sur son contrat
+## v1.242.0 — 18/09/2026 à 18:25 — Les documents d'un placement vivent sur son contrat
 
 La fiche d'un placement porte désormais un bloc **Documents**, sous les
 nantissements — le même que sur un prêt ou un bien immobilier. On y dépose le
@@ -59,6 +59,46 @@ comme pour n'importe quel document de deal.
 >   une société.
 
 ---
+
+## v1.241.0 — 18/09/2026 à 18:00 — Le fil de recherche de l'assistant, façon AI Elements
+
+Le bloc « sources consultées » livré ce midi restait une carte bordée avec
+une ligne par appel : quarante lectures du même outil faisaient quarante
+lignes et un « 41 sources consultées » qui ne disait rien. Il est refait sur
+les composants d'AI Elements, la bibliothèque de Vercel pour les interfaces
+de chat :
+
+- **Un fil d'étapes** sans bordure : une étape par source, reliées par un
+  trait, l'étape en cours en noir, les faites en gris, le nombre d'éléments
+  en dessous. Loupe pour une lecture, crayon pour une écriture.
+- **L'en-tête porte l'activité** en texte à reflet (« Lecture des
+  valorisations… », « Réflexion… ») tant que la réponse s'écrit, puis le fil
+  se replie tout seul en « 3 sources consultées ».
+- **Une rafale = une étape** : quarante appels du même outil deviennent
+  « Lecture des valorisations · 40 appels ». Le détail brut de chaque appel
+  reste à un clic sous l'étape.
+- Confirmer / Refuser restent dans l'étape concernée, fil ouvert de force.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/ai-elements/chain-of-thought.tsx` et `shimmer.tsx`
+>   vendorisés depuis `vercel/ai-elements` avec les trims documentés dans
+>   `KNOWN_ISSUES.md` (§ Streamdown) : alias `@repo/shadcn-ui` →
+>   `~/components/ui`, `useControllableState` → `useState` local, `motion`
+>   → keyframes `.ai-shimmer` (`src/styles/app.css`, recette à deux couches
+>   de l'upstream, `--spread` par instance).
+> - `ToolGroup.tsx` réécrit : `toSteps` regroupe les appels consécutifs du
+>   même outil, un `ChainOfThoughtStep` par étape (icône `SearchIcon` pour
+>   `list*`/`get*`/`search*`, `PencilIcon` sinon, `SpinnerIcon` en cours,
+>   `XCircleIcon` en erreur), description `calls · items`, un `Tool`
+>   (`ToolHeader` titré « Détails » / « Appel N ») par appel avec sa
+>   `Confirmation`. Prop `live` (message en stream et rien après le groupe) :
+>   l'en-tête porte le `Shimmer`, le bloc est ouvert ; repli automatique via
+>   `useEffect` sur `live || attention`.
+> - `AiPanel.tsx` : `activityLabel` ne parle plus que tant qu'aucun outil
+>   n'a été appelé ; `ActivityLine` rend `<Shimmer>`.
+> - i18n `chat.json` fr/en : `tool.state*` restaurés (badge du `ToolHeader`),
+>   `tool.calls`, `tool.call`, `tool.details`.
 
 ## v1.240.1 — 18/09/2026 à 18:05 — Ménage : l'ancienne timeline d'e-mails a quitté la base
 

@@ -31,9 +31,22 @@
     "denied": "Action declined"
   },
   "tool": {
+    "statePending": "Pending",
+    "stateRunning": "Running",
+    "stateApprovalRequested": "Confirmation required",
+    "stateApprovalResponded": "Response sent",
+    "stateCompleted": "Done",
+    "stateError": "Error",
+    "stateDenied": "Declined",
     "parameters": "Parameters",
     "result": "Result",
     "error": "Error",
+    "items_one": "{{count}} item",
+    "items_other": "{{count}} items",
+    "calls_one": "{{count}} call",
+    "calls_other": "{{count}} calls",
+    "call": "Call {{n}}",
+    "details": "Details",
     "labels": {
       "addLoanAmendment": "Adding an amendment",
       "addLoanRate": "Adding a rate step",
@@ -102,9 +115,7 @@
       "updateForecastRule": "Updating a forecast rule",
       "updateIntercompanyLoan": "Updating a current account",
       "webSearch": "Web search"
-    },
-    "items_one": "{{count}} item",
-    "items_other": "{{count}} items"
+    }
   },
   "threads": {
     "history": "History",

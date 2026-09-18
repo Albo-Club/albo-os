@@ -1245,17 +1245,21 @@ cette zone :
    `@streamdown/{code,math,mermaid,cjk}` (Shiki + KaTeX + Mermaid = des Mo
    de bundle). On les a retirés (le core garde le GFM : tableaux, listes).
    Idem `tool.tsx` : le `CodeBlock` upstream (Shiki) est remplacé par un
-   `<pre>` local. **Toute réinstallation/maj depuis le registry AI Elements
-   doit re-appliquer ces deux trims** (commentaires en place dans les
-   fichiers).
+   `<pre>` local. `shimmer.tsx` : upstream anime avec `motion/react` (qu'on
+   ne ship pas) — le nôtre garde la même recette de fond à deux couches
+   mais l'anime par les keyframes `.ai-shimmer` de `src/styles/app.css`.
+   `chain-of-thought.tsx` : `useControllableState` (paquet Radix absent)
+   remplacé par un `useState` contrôlé/non contrôlé local. **Toute
+   réinstallation/maj depuis le registry AI Elements doit re-appliquer ces
+   trims** (commentaires en place dans les fichiers).
 3. **Labels i18n de `tool.tsx`** : les libellés hardcodés anglais upstream
    (Pending/Running/Completed/Parameters/Result) sont exposés en props
    (`statusLabel`, `label`, `errorLabel`) renseignées par
    `src/components/ai/ToolGroup.tsx` via `t('chat:tool.*')`. Depuis 09/2026
-   le panneau n'utilise plus que `ToolInput` / `ToolOutput` de ce fichier :
-   les appels sont regroupés par `ToolGroup` (un bloc par réponse, libellés
-   humains `chat:tool.labels.*`, garde-fou `tests/toolLabels.test.ts`), pas
-   par `Tool` / `ToolHeader` upstream. À re-vérifier après une maj du
+   les appels sont regroupés par `ToolGroup` dans un `ChainOfThought` (une
+   étape par outil, libellés humains `chat:tool.labels.*`, garde-fou
+   `tests/toolLabels.test.ts`) ; `Tool` / `ToolHeader` ne servent plus qu'au
+   détail d'un appel sous son étape. À re-vérifier après une maj du
    composant.
 
 ## Approbation d'outils (panneau AI) — reprise du stream obligatoire

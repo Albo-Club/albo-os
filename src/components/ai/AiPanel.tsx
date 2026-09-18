@@ -42,13 +42,9 @@ import {
   PromptInputSubmit,
   PromptInputTextarea,
 } from '~/components/ai-elements/prompt-input'
+import { Shimmer } from '~/components/ai-elements/shimmer'
 import { Suggestion } from '~/components/ai-elements/suggestion'
-import {
-  ToolGroup,
-  isRunning,
-  toolLabel,
-  toolName,
-} from '~/components/ai/ToolGroup'
+import { ToolGroup } from '~/components/ai/ToolGroup'
 import { Button } from '~/components/ui/button'
 import {
   Dialog,
@@ -112,6 +108,7 @@ function MessageParts({
           <div key={i} className="space-y-2">
             <ToolGroup
               parts={seg.parts}
+              live={message.status === 'streaming' && i === segments.length - 1}
               onRespondApproval={onRespondApproval}
               respondingApprovalId={respondingApprovalId}
             />
@@ -127,28 +124,22 @@ function isToolPart(part: UIMessage['parts'][number]): part is ToolPart {
 }
 
 /**
- * What the assistant is doing right now, while its message streams: the
- * running tool's label, otherwise "Réflexion…" (before the first tool, and
- * after a tool returned — the model may call another one or start writing).
- * `null` once text is flowing (the text is the indicator) or while a tool
- * waits for the user.
+ * The activity line of a message that streams without any tool call yet:
+ * "Réflexion…" until its text starts. Once a tool has been called, the
+ * ToolGroup header carries the activity itself (running tool, or
+ * "Réflexion…" between two calls), so this stays silent.
  */
 function activityLabel(message: UIMessage, t: TFunction): string | null {
-  const last = [...message.parts]
-    .reverse()
-    .find((p) => p.type === 'text' || isToolPart(p))
-  if (!last) return t('chat:thinking')
-  if (last.type === 'text') return last.text ? null : t('chat:thinking')
-  if (isRunning(last)) return `${toolLabel(t, toolName(last))}…`
-  if (last.state === 'approval-requested') return null
-  return t('chat:thinking')
+  if (message.parts.some(isToolPart)) return null
+  const text = message.parts.find((p) => p.type === 'text')
+  return text?.text ? null : t('chat:thinking')
 }
 
 /** One line of shimmering text: the "something is happening" signal. */
 function ActivityLine({ children }: { children: string }) {
   return (
-    <span role="status" className="ai-shimmer text-sm">
-      {children}
+    <span role="status" className="text-sm">
+      <Shimmer as="span">{children}</Shimmer>
     </span>
   )
 }
