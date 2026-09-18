@@ -62,6 +62,7 @@ ne restait que trois points gris. Désormais :
 >   `sources.*`, `tool.items` ; `tests/toolLabels.test.ts`
 >   compare les clés aux exports `*Tools` de `convex/agentTools*.ts` (un
 >   outil sans libellé fait rougir la CI).
+
 ## v1.239.3 — 18/09/2026 à 14:55 — La rotation des sauvegardes fait vraiment le ménage
 
 La sauvegarde quotidienne annonçait depuis dix jours qu'elle purgeait les
