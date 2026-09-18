@@ -142,7 +142,11 @@ function dealUrl(
 }
 
 const centsArg = (what: string) =>
-  z.number().int().optional().describe(`${what} — CENTS EUR (50 000 € → 5000000)`)
+  z
+    .number()
+    .int()
+    .optional()
+    .describe(`${what} — CENTS EUR (50 000 € → 5000000)`)
 
 const bpsArg = (what: string) =>
   z.number().int().optional().describe(`${what} — BASIS POINTS (11 % → 1100)`)
@@ -569,6 +573,56 @@ export const mcpTools: Array<McpTool> = [
       }),
   }),
   defineTool({
+    name: 'getLoanSchedule',
+    description:
+      'Amortization schedule of one loan, windowed around today: date, ' +
+      'instalment, capital, interest, insurance, outstanding after payment, ' +
+      'and the ACTUAL amount debited in that instalment period. The plan is ' +
+      'the source of the outstanding; the actual is a control — a divergence ' +
+      'means an incomplete matching or an unrecorded event, not a bug. On a ' +
+      'variable-rate loan, instalments past the last actual revision are ' +
+      'flagged `projected`: the rate is unknown, not predicted. Find ids via ' +
+      'listLoans.',
+    schema: {
+      org: orgSlug,
+      loanId: z.string().describe('Loan id from listLoans'),
+      limit: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Instalments to return around today (default 12, max 60)'),
+    },
+    run: async (ctx, actorUserId, { org, loanId, limit }) =>
+      await ctx.runQuery(internal.agentToolsDebt.getLoanScheduleInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        loanId: loanId as Id<'loans'>,
+        limit,
+      }),
+  }),
+  defineTool({
+    name: 'getPledgesOnDeal',
+    description:
+      'What a placement secures in total, and how much room is left: its ' +
+      'current value, the total pledged on it, and the available margin. The ' +
+      'list includes the pledges benefiting ANOTHER group company or an ' +
+      'outside borrower — leaving those out is exactly how the margin gets ' +
+      'overstated. The margin is deliberately pessimistic: a pledged amount ' +
+      'is worth its deed amount until the release, whatever is left of the ' +
+      'debt. A negative margin is information, not an error.',
+    schema: {
+      org: orgSlug,
+      dealId: z.string().describe('Deal id of the pledged placement'),
+    },
+    run: async (ctx, actorUserId, { org, dealId }) =>
+      await ctx.runQuery(internal.agentToolsDebt.getPledgesOnDealInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        dealId: dealId as Id<'deals'>,
+      }),
+  }),
+  defineTool({
     name: 'listProperties',
     description:
       'Real-estate properties of an org with their COST PRICE line item by ' +
@@ -770,7 +824,12 @@ export const mcpTools: Array<McpTool> = [
       const orgId = await orgIdFor(ctx, actorUserId, org)
       const updated = await ctx.runMutation(
         internal.agentTools.updateCompanyInternal,
-        { orgId, actorUserId, companyId: companyId as Id<'companies'>, ...patch },
+        {
+          orgId,
+          actorUserId,
+          companyId: companyId as Id<'companies'>,
+          ...patch,
+        },
       )
       return { _id: updated._id, url: companyUrl(org, updated._id) }
     },
@@ -862,7 +921,11 @@ export const mcpTools: Array<McpTool> = [
       ...dealValueSchema,
     },
     write: true,
-    run: async (ctx, actorUserId, { org, dealId, viaSpvCompanyId, ...fields }) => {
+    run: async (
+      ctx,
+      actorUserId,
+      { org, dealId, viaSpvCompanyId, ...fields },
+    ) => {
       const orgId = await orgIdFor(ctx, actorUserId, org)
       const { instrumentKind, convertedAtISO, status, ...values } = fields
       const updated = await ctx.runMutation(
@@ -920,7 +983,11 @@ export const mcpTools: Array<McpTool> = [
       notes: z.string().optional(),
     },
     write: true,
-    run: async (ctx, actorUserId, { org, signedDate, firstPaymentDate, ...fields }) => {
+    run: async (
+      ctx,
+      actorUserId,
+      { org, signedDate, firstPaymentDate, ...fields },
+    ) => {
       const orgId = await orgIdFor(ctx, actorUserId, org)
       const created = await ctx.runMutation(
         internal.agentToolsDebt.createLoanInternal,
@@ -1014,6 +1081,228 @@ export const mcpTools: Array<McpTool> = [
         },
       )
       return { _id: created._id, url: appUrl(org, 'immobilier') }
+    },
+  }),
+  defineTool({
+    name: 'createGuarantee',
+    description:
+      'Attach a security to a bank loan of the org. THREE independent pieces ' +
+      'of information (never confuse them): the FORM (nantissement, ' +
+      'hypotheque, ppd, caution, garantie_organisme), the SUBJECT it bites ' +
+      'on (exactly one of subjectDealId for a placement, subjectPropertyId ' +
+      'for a property, subjectCompanyId for shares, or subjectLabel for ' +
+      'something that is not ours), and the GUARANTOR (pledgorOrgId for a ' +
+      'group company, or pledgorLabel for anyone else — a personal caution ' +
+      'is a LABEL, never a person record). Leave pledgedAmountCents EMPTY ' +
+      'when the deed does not quantify it (an unlimited caution): it is then ' +
+      'excluded from the pledged total, and a zero would lie. Find ids via ' +
+      'listLoans, listDeals, listProperties, listCompanies, listOrgs.',
+    schema: {
+      org: orgSlug,
+      loanId: z.string().describe('Loan id from listLoans'),
+      form: z.enum([
+        'nantissement',
+        'hypotheque',
+        'ppd',
+        'caution',
+        'garantie_organisme',
+      ]),
+      subjectDealId: z.string().optional().describe('A placement (listDeals)'),
+      subjectPropertyId: z
+        .string()
+        .optional()
+        .describe('A property (listProperties)'),
+      subjectCompanyId: z
+        .string()
+        .optional()
+        .describe('Shares (listCompanies)'),
+      subjectLabel: z
+        .string()
+        .optional()
+        .describe('Something not ours, e.g. "Saccef"'),
+      pledgorOrgId: z.string().optional().describe('Group org id (listOrgs)'),
+      pledgorLabel: z
+        .string()
+        .optional()
+        .describe('Outside guarantor, e.g. "Clément Alteresco"'),
+      rank: z.number().int().min(1).optional().describe('1 = first rank'),
+      pledgedAmountCents: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Amount ON THE DEED. Omit when not quantified'),
+      actDate: z.string().optional().describe('ISO date "YYYY-MM-DD"'),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, loanId, actDate, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentToolsDebt.createGuaranteeInternal,
+        {
+          orgId,
+          actorUserId,
+          loanId: loanId as Id<'loans'>,
+          ...fields,
+          subjectDealId: fields.subjectDealId as Id<'deals'> | undefined,
+          subjectPropertyId: fields.subjectPropertyId as
+            | Id<'properties'>
+            | undefined,
+          subjectCompanyId: fields.subjectCompanyId as
+            | Id<'companies'>
+            | undefined,
+          pledgorOrgId: fields.pledgorOrgId as Id<'organizations'> | undefined,
+          actDate: actDate ? parseISODate(actDate) : undefined,
+        },
+      )
+      return { _id: created._id, url: appUrl(org, 'passif') }
+    },
+  }),
+  defineTool({
+    name: 'releaseGuarantee',
+    description:
+      'Record a MAINLEVÉE on a guarantee: it stops counting towards the ' +
+      'pledged total, and the row STAYS as history. This is not a deletion — ' +
+      'deleting a guarantee entered by mistake is a UI gesture. Find ids via ' +
+      'listGuarantees.',
+    schema: {
+      org: orgSlug,
+      guaranteeId: z.string().describe('Guarantee id from listGuarantees'),
+      releasedAt: z.string().describe('Mainlevée date "YYYY-MM-DD"'),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, guaranteeId, releasedAt }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      await ctx.runMutation(internal.agentToolsDebt.releaseGuaranteeInternal, {
+        orgId,
+        actorUserId,
+        guaranteeId: guaranteeId as Id<'guarantees'>,
+        releasedAt: parseISODate(releasedAt),
+      })
+      return { guaranteeId, url: appUrl(org, 'passif') }
+    },
+  }),
+  defineTool({
+    name: 'addLoanRate',
+    description:
+      'Add a dated step to a VARIABLE-rate loan: a revision that happened ' +
+      '(kind "actual") or a steering assumption (kind "forecast"). The ' +
+      'distinction is not cosmetic — instalments past the last "actual" step ' +
+      'are flagged as projected, because the app does not pretend to know a ' +
+      'future rate. Refused on a fixed-rate loan. One step per date: the ' +
+      'same date replaces. Rates in BASIS POINTS (396 = 3,96 %).',
+    schema: {
+      org: orgSlug,
+      loanId: z.string().describe('Loan id from listLoans'),
+      fromDate: z.string().describe('Effective date "YYYY-MM-DD"'),
+      rateBps: z.number().int().min(0).describe('basis points'),
+      kind: z.enum(['actual', 'forecast']),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (ctx, actorUserId, { org, loanId, fromDate, ...fields }) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentToolsDebt.addLoanRateInternal,
+        {
+          orgId,
+          actorUserId,
+          loanId: loanId as Id<'loans'>,
+          fromDate: parseISODate(fromDate),
+          ...fields,
+        },
+      )
+      return { ...created, url: appUrl(org, 'passif') }
+    },
+  }),
+  defineTool({
+    name: 'addLoanAmendment',
+    description:
+      'Record a dated AMENDMENT to a loan (a renegotiation). It KEEPS the ' +
+      'history: instalments already run do not move, and the new terms apply ' +
+      'to the capital that remains from the effective date. Do NOT use this ' +
+      'to fix a typo — that is a correction, and it is a UI gesture. Only ' +
+      'pass the fields that actually change; the rest carries over. Set ' +
+      'outstandingCents ONLY if the lender restated the capital, otherwise ' +
+      'the app derives it. Refused on a revolving and before the first ' +
+      'instalment.',
+    schema: {
+      org: orgSlug,
+      loanId: z.string().describe('Loan id from listLoans'),
+      effectiveDate: z.string().describe('ISO date "YYYY-MM-DD"'),
+      rateBps: z.number().int().min(0).optional().describe('basis points'),
+      durationMonths: z
+        .number()
+        .int()
+        .positive()
+        .optional()
+        .describe('Duration REMAINING from the effective date'),
+      insuranceMonthlyCents: z.number().int().min(0).optional(),
+      outstandingCents: z
+        .number()
+        .int()
+        .min(0)
+        .optional()
+        .describe('Only if the lender restated it'),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (
+      ctx,
+      actorUserId,
+      { org, loanId, effectiveDate, ...fields },
+    ) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.agentToolsDebt.addLoanAmendmentInternal,
+        {
+          orgId,
+          actorUserId,
+          loanId: loanId as Id<'loans'>,
+          effectiveDate: parseISODate(effectiveDate),
+          ...fields,
+        },
+      )
+      return { ...created, url: appUrl(org, 'passif') }
+    },
+  }),
+  defineTool({
+    name: 'createValuation',
+    description:
+      'Record a dated valuation (fair value) for a DEAL — the counterpart of ' +
+      'addPropertyValuation for real estate. One valuation per date: the ' +
+      'same date replaces. valuationMethod is a free label ("last_round", ' +
+      '"mark_to_market", "reported_nav"). Amounts in CENTS EUR. Find ids via ' +
+      'listDeals, history via listValuations.',
+    schema: {
+      org: orgSlug,
+      dealId: z.string().describe('Deal id from listDeals'),
+      asOf: z.string().describe('ISO date "YYYY-MM-DD"'),
+      fairValueCents: z.number().int().positive().describe('cents EUR'),
+      valuationMethod: z.string().optional(),
+      source: z.string().optional(),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (
+      ctx,
+      actorUserId,
+      { org, dealId, asOf, fairValueCents, ...fields },
+    ) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.valuations.createInternal,
+        {
+          orgId,
+          actorUserId,
+          dealId: dealId as Id<'deals'>,
+          asOf: parseISODate(asOf),
+          fairValue: fairValueCents,
+          ...fields,
+        },
+      )
+      return { _id: created._id, url: appUrl(org, 'participations') }
     },
   }),
 ]

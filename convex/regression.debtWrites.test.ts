@@ -106,19 +106,31 @@ describe('every debt write tool asks before writing (D34)', () => {
 })
 
 describe('the MCP server marks the same writes as writes', () => {
-  test.each(['createLoan', 'createProperty', 'addPropertyValuation'])(
-    '%s is annotated readOnlyHint: false',
-    (name) => {
-      const tool = mcpTools.find((row) => row.name === name)
-      expect(tool).toBeDefined()
-      // `needsApproval` has no effect over MCP — there is no in-app UI to
-      // show it. The annotation is what makes a client confirm.
-      expect(tool?.annotations.readOnlyHint).toBe(false)
-    },
-  )
+  test.each([
+    'createLoan',
+    'createProperty',
+    'addPropertyValuation',
+    'createGuarantee',
+    'releaseGuarantee',
+    'addLoanRate',
+    'addLoanAmendment',
+    'createValuation',
+  ])('%s is annotated readOnlyHint: false', (name) => {
+    const tool = mcpTools.find((row) => row.name === name)
+    expect(tool).toBeDefined()
+    // `needsApproval` has no effect over MCP — there is no in-app UI to
+    // show it. The annotation is what makes a client confirm.
+    expect(tool?.annotations.readOnlyHint).toBe(false)
+  })
 
   test('the debt read tools stay annotated read-only', () => {
-    for (const name of ['listLoans', 'listGuarantees', 'listProperties']) {
+    for (const name of [
+      'listLoans',
+      'listGuarantees',
+      'listProperties',
+      'getLoanSchedule',
+      'getPledgesOnDeal',
+    ]) {
       const tool = mcpTools.find((row) => row.name === name)
       expect(tool).toBeDefined()
       expect(tool?.annotations.readOnlyHint).toBe(true)

@@ -911,6 +911,15 @@ export const remove = mutation({
   derrière l'échec du garde-fou. Toute consigne destructive donne la commande
   complète, et demande de **vérifier le résultat du snapshot** avant l'étape
   suivante.
+- ❌ Livrer un outil sur **une seule** des deux façades IA sans décider pour
+  l'autre. L'agent in-app (`convex/agentTools*.ts`) et le serveur MCP
+  (`convex/mcp/registry.ts`) servent les mêmes internals : un outil ajouté
+  d'un côté seulement creuse un écart que rien ne signale — 66 contre 35 au
+  moment où le nantissement a dû être saisi à la main depuis claude.ai. La
+  question se pose à chaque nouvel outil, et la réponse « non » est légitime
+  (pointage, prévisionnel, suppressions restent hors MCP) — c'est l'absence
+  de décision qui ne l'est pas. Le portage est un wrapper sur l'internal
+  existant : jamais une seconde implémentation.
 - ❌ Anchor `#section` for nav between major sections.
 - ❌ Unrequested dark/light toggle.
 - ❌ `tailwind.config.js` (Tailwind v4 is CSS-first).
