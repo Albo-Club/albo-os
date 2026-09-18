@@ -505,3 +505,74 @@ describe('Attio bridge: attioDealId / attioCompanyId idempotence', () => {
     expect(new Set(deals.map((d) => d.targetCompanyId)).size).toBe(1)
   })
 })
+
+describe('MCP updateDeal / updateCompany: fields only the MCP tools write', () => {
+  test('spvOwnershipPct and attioDealId land on the row; the Attio id is unique', async () => {
+    const { t, user, org } = await orgSetup('org-mcp-fields')
+    const target = await createPortfolioCompany(t, org.orgId, 'Target')
+    const create = () =>
+      user.as.mutation(api.deals.create, {
+        orgId: org.orgId,
+        investorCompanyId: org.rootCompanyId,
+        targetCompanyId: target,
+        instrumentKind: 'spv_share',
+      })
+    const dealId = await create()
+    const otherId = await create()
+
+    await t.mutation(internal.agentTools.updateDealInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      dealId,
+      spvOwnershipPct: 650,
+      attioDealId: ' attio-deal-9 ',
+    })
+    const deal = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(deal).toMatchObject({
+      spvOwnershipPct: 650,
+      attioDealId: 'attio-deal-9',
+    })
+
+    // Another deal cannot claim the same Attio record.
+    await expectConvexError(
+      t.mutation(internal.agentTools.updateDealInternal, {
+        orgId: org.orgId,
+        actorUserId: user.userId,
+        dealId: otherId,
+        attioDealId: 'attio-deal-9',
+      }),
+      'attio_deal_id_already_used',
+    )
+    // Re-sending its own id is not a clash, and '' clears it.
+    await t.mutation(internal.agentTools.updateDealInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      dealId,
+      attioDealId: 'attio-deal-9',
+    })
+    await t.mutation(internal.agentTools.updateDealInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      dealId,
+      attioDealId: '',
+    })
+    const cleared = await t.run(async (ctx) => ctx.db.get('deals', dealId))
+    expect(cleared?.attioDealId).toBeUndefined()
+  })
+
+  test('incorporationDate lands on the company', async () => {
+    const { t, user, org } = await orgSetup('org-mcp-incorporation')
+    const companyId = await createPortfolioCompany(t, org.orgId, 'Target')
+    const incorporationDate = Date.UTC(2012, 0, 1)
+    await t.mutation(internal.agentTools.updateCompanyInternal, {
+      orgId: org.orgId,
+      actorUserId: user.userId,
+      companyId,
+      incorporationDate,
+    })
+    const company = await t.run(async (ctx) =>
+      ctx.db.get('companies', companyId),
+    )
+    expect(company?.incorporationDate).toBe(incorporationDate)
+  })
+})
