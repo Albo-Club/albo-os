@@ -6,7 +6,6 @@ import { api } from '../../../convex/_generated/api'
 import {
   ALL_MODULES,
   hideBlockedBy,
-  isVisible,
   visibleModules,
 } from '../../../convex/lib/modules'
 import type { Id } from '../../../convex/_generated/dataModel'
@@ -83,8 +82,12 @@ export function SubsectionsMenu({
           {t('nav:modules.subsections')}
         </DropdownMenuLabel>
         {ALL_MODULES.map((module) => {
-          const state = states?.find((row) => row.key === module)
-          const on = state ? isVisible(state) : visible.includes(module)
+          // Read off `visibleModules` and not off `isVisible` alone: the
+          // fallback puts Entreprises on screen for an org that has chosen
+          // nothing, and a row shown as unticked while its tab is there would
+          // be a lie. While the query is in flight everything reads as on,
+          // like the tabs themselves.
+          const on = states ? visible.includes(module) : true
           const blocked = states ? hideBlockedBy(states, module) : null
           return (
             <DropdownMenuCheckboxItem
