@@ -23,6 +23,7 @@ bas de page.
 
 ---
 
+<<<<<<< HEAD
 ## v1.242.1 — 18/09/2026 à 18:35 — Ménage : vider quatre tables inertes
 
 Outil de purge des quatre dernières tables héritées de fonctionnalités
@@ -40,6 +41,45 @@ connexions Vasco), avant de les retirer de la base. Rien ne change à l'écran.
 >   appliqué tout part, rejeu à zéro.
 > - `MIGRATIONS.md` : la ligne de l'opération (ordre, pas de snapshot
 >   spécifique, PR de suivi qui resserre le schéma).
+=======
+## v1.243.0 — 18/09/2026 à 18:27 — L'onglet À faire réclame un relevé de titres quand il vieillit
+
+Quand une banque n'est pas couverte par la connexion bancaire — le cas de
+Natixis Wealth Management — le relevé importé est la **seule** façon dont la
+valeur des comptes-titres entre dans l'app. Passé **90 jours**, l'onglet
+À faire le réclame : « Relevés de titres à renouveler », avec la date du
+dernier relevé et un lien vers les placements.
+
+Trois choix, pour que ce rappel reste un rappel et pas un bruit de fond :
+
+- **Une ligne par banque**, pas par compte. Un relevé Natixis couvre les
+  trois comptes d'un coup ; trois lignes seraient trois rappels pour un seul
+  dépôt.
+- **C'est la date du relevé qui compte**, jamais celle de l'import. Un relevé
+  d'août déposé en novembre a trois mois dans les deux cas.
+- **Une banque dont aucun relevé n'a jamais été importé n'apparaît pas.** Il
+  n'y a rien à renouveler, et un onglet qui crie dès le premier jour s'ignore
+  très vite.
+
+Le bloc se vide tout seul dès qu'un relevé récent est importé.
+
+> **🔧 Notes techniques**
+>
+> - Signal `staleStatements` dans `convex/todo.ts:getTodo`, sur le patron des
+>   cinq autres signaux dérivés : lecture de `statementImports` par `by_org`,
+>   réduction au `statementDate` le plus récent **par `source`**, seuil
+>   `STALE_STATEMENT_MS` (90 j — volontairement plus court que les 18 mois
+>   d'une valorisation immobilière : un compte-titres bouge tous les jours).
+> - Le « déjà importé au moins une fois » est la même règle d'habitude que le
+>   signal des loyers manquants : sans historique, pas de signal.
+> - Section dans `todo.tsx` + clés i18n `todo:staleStatements.*` (fr + en).
+> - `convex/regression.staleStatements.test.ts` (6 cas) : 89 j muet / 91 j
+>   crie, la date du relevé prime sur celle de l'import, seul le relevé le
+>   plus récent est jugé, une ligne quel que soit le nombre de comptes, org
+>   sans import muette, et pas de fuite entre orgs.
+
+---
+>>>>>>> origin/main
 
 ## v1.242.0 — 18/09/2026 à 18:25 — Les documents d'un placement vivent sur son contrat
 

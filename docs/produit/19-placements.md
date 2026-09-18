@@ -148,7 +148,9 @@ sur la fiche placement, et la base d'une future courbe d'évolution.
 - Un placement alimenté par relevé vaut ce que disait **le dernier relevé
   importé**. Entre deux relevés le chiffre ne bouge pas : c'est voulu, et
   c'est pour ça que la date du document est affichée partout plutôt que
-  celle de l'import.
+  celle de l'import. Passé **90 jours**, l'onglet [À faire](16-a-faire.md)
+  réclame un relevé frais pour cette banque — une seule ligne, quel que soit
+  le nombre de comptes qu'il couvre.
 - **Réimporter le même relevé le corrige**, il ne le double pas : l'app
   range un relevé par date, et un second dépôt à la même date remplace le
   premier. Un relevé d'une autre date ajoute un point à l'historique sans
@@ -167,4 +169,4 @@ sur la fiche placement, et la base d'une future courbe d'évolution.
 - [Entreprises](04-participations.md) (l'autre sous-onglet
   d'Investissements), [Pointage](08-pointage.md) (rattacher les
   versements/retraits), [Trésorerie](07-tresorerie.md) (les comptes
-  bancaires courants)
+  bancaires courants), [À faire](16-a-faire.md) (le rappel de relevé)
