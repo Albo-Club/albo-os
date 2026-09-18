@@ -804,7 +804,11 @@ const isExpectedMergeTarget = (
   target != null &&
   (target.name === spec.expectedTarget || target.name === spec.expectedTargetTo)
 
-/** Every row pointing at a company, per table — used to guard archiving. */
+/**
+ * Every row pointing at a company, per table — used to guard archiving.
+ * (`companyEmailLinks` was part of it until that table was purged and dropped
+ * on 18/09/2026 — MIGRATIONS.md « Purge de l'ancienne timeline d'e-mails ».)
+ */
 async function companyRefs(
   ctx: Ctx,
   orgId: Id<'organizations'>,
@@ -819,7 +823,6 @@ async function companyRefs(
     docs,
     reports,
     intel,
-    links,
     banks,
   ] = await Promise.all([
     ctx.db
@@ -859,10 +862,6 @@ async function companyRefs(
       .withIndex('by_company', (q) => q.eq('companyId', id))
       .collect(),
     ctx.db
-      .query('companyEmailLinks')
-      .withIndex('by_company_and_sentAt', (q) => q.eq('companyId', id))
-      .collect(),
-    ctx.db
       .query('bankAccounts')
       .withIndex('by_owner', (q) =>
         q.eq('orgId', orgId).eq('ownerCompanyId', id),
@@ -878,7 +877,6 @@ async function companyRefs(
     docs,
     reports,
     intel,
-    links,
     banks,
     kpis: scope.kpis.filter((k) => k.companyId === id),
     todos: scope.todos.filter((t) => t.companyId === id),
@@ -1144,7 +1142,6 @@ export const dryRun = internalQuery({
             documents: refs.docs.length,
             reports: refs.reports.length,
             intelligence: refs.intel.length,
-            emailLinks: refs.links.length,
             bankAccounts: refs.banks.length,
             kpiSnapshots: refs.kpis.length,
             todos: refs.todos.length,
@@ -1445,9 +1442,6 @@ export const apply = internalMutation({
       for (const r of refs.reports) {
         await ctx.db.patch('companyReports', r._id, { companyId: to._id })
       }
-      for (const l of refs.links) {
-        await ctx.db.patch('companyEmailLinks', l._id, { companyId: to._id })
-      }
       for (const b of refs.banks) {
         await ctx.db.patch('bankAccounts', b._id, { ownerCompanyId: to._id })
       }
@@ -1645,7 +1639,7 @@ export const apply = internalMutation({
       scope.allDeals = scope.allDeals.filter((d) => d._id !== deal._id)
       // Same rule as the shells above: the card goes only when NOTHING points
       // at it any more — a partial check would archive a card still carrying
-      // relations, KPIs, e-mail links or todos (cf. companies.archive).
+      // relations, KPIs or todos (cf. companies.archive).
       const remaining = await companyRefs(
         ctx,
         orgId,

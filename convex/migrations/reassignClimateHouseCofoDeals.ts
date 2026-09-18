@@ -120,6 +120,8 @@ async function findCofo(ctx: Ctx, orgId: Id<'organizations'>) {
 /**
  * Everything that can still name a card. A person card goes only when it scores
  * zero on all of it — same inventory as the sibling migrations.
+ * (`companyEmailLinks` was part of it until that table was purged and dropped
+ * on 18/09/2026 — MIGRATIONS.md « Purge de l'ancienne timeline d'e-mails ».)
  */
 async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
   const [
@@ -131,7 +133,6 @@ async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
     docs,
     reports,
     intel,
-    links,
     banks,
     kpis,
     todos,
@@ -179,10 +180,6 @@ async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
       .withIndex('by_company', (q) => q.eq('companyId', id))
       .collect(),
     ctx.db
-      .query('companyEmailLinks')
-      .withIndex('by_company_and_sentAt', (q) => q.eq('companyId', id))
-      .collect(),
-    ctx.db
       .query('bankAccounts')
       .withIndex('by_owner', (q) =>
         q.eq('orgId', orgId).eq('ownerCompanyId', id),
@@ -217,7 +214,6 @@ async function refs(ctx: Ctx, orgId: Id<'organizations'>, id: Id<'companies'>) {
     documents: docs.length,
     reports: reports.length,
     intelligence: intel.length,
-    emailLinks: links.length,
     bankAccounts: banks.length,
     kpiSnapshots: kpis.length,
     todos: todos.filter((t) => t.companyId === id).length,

@@ -2,7 +2,7 @@
  * Who still points at a stored blob — the only question that makes deleting
  * one safe (ALB-234).
  *
- * Six places in the Convex schema can hold a storage reference. "This blob
+ * Five places in the Convex schema can hold a storage reference. "This blob
  * has no `documents` row" therefore proves nothing: an attachment on a
  * received email is in use and invisible to that join. These helpers turn the
  * reverse index (blob → holder tables) into the four buckets a human can
@@ -18,7 +18,6 @@
 export const HOLDER_TABLES = [
   'documents',
   'inboundEmails',
-  'companyEmails',
   'users',
   'organizations',
 ]
@@ -26,7 +25,6 @@ export const HOLDER_TABLES = [
 export const HOLDER_LABEL = {
   documents: 'une fiche (document)',
   inboundEmails: 'un mail reçu, sans document',
-  companyEmails: 'la timeline email RETIRÉE',
   users: 'un avatar',
   organizations: 'un logo',
   none: 'plus rien du tout',
