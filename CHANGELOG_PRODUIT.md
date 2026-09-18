@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.238.0 — 18/09/2026 à 10:57 — Le connecteur Claude sait lire un échéancier et poser une garantie
+## v1.238.0 — 18/09/2026 à 11:16 — Le connecteur Claude sait lire un échéancier et poser une garantie
 
 Le connecteur Claude (celui qu'on branche dans claude.ai) ne connaissait du
 passif que la liste des prêts et des garanties. Il sait désormais faire ce
@@ -67,6 +67,34 @@ chacune de ces cinq écritures et renvoie le lien de la fiche dans l'app.
 >   `convex/regression.debtWrites.test.ts` couvre les 7 nouveaux outils.
 > - Restent volontairement hors connecteur : pointage, prévisionnel, écritures
 >   de passif (comptes courants, capital) et suppressions.
+
+---
+
+## v1.237.1 — 18/09/2026 à 11:00 — Ménage : l'ancienne copie du texte des documents
+
+Outil interne, rien de visible dans l'app. Chaque fiche document traînait
+encore une vieille copie de son texte extrait, écrite par un ancien système,
+que plus rien ne lit mais que chaque ouverture de fiche société chargeait
+quand même. Une opération à lancer une fois vide ces copies, en gardant le
+texte là où il sert (et en évitant de repayer une lecture OCR pour les
+documents dont c'était la seule copie).
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/legacyExtractedText.ts` : `scanPage` (pagination de
+>   `documents` bornée à 4 Mio par `maximumBytesRead`, renvoie les lignes
+>   portant `extractedText` et leur taille) et `migrateBatch` (par document :
+>   `documentTexts` existant → on efface juste le champ ; sinon on y copie le
+>   texte via `boundText`, `ocrState: 'extracted'`, `ocrChars`, `vectorState`
+>   remis à `undefined` pour que `backfillAll` indexe). Idempotent.
+> - `scripts/legacy-extracted-text.mjs` : à blanc par défaut, `--apply`
+>   migre par lots de 4 (une ligne + son `documentTexts` ≈ jusqu'à 1 Mio
+>   chacun, limite mutation 16 Mio). Fonctions feuilles, pas d'auto-référence
+>   `internal.*`.
+> - `convex/regression.legacyExtractedText.test.ts` (6 cas, via `anyApi`).
+> - Runbook : ligne dans `MIGRATIONS.md` + chantier « retrait du champ
+>   legacy » mis à jour. Le retrait du champ dans le schéma reste une PR de
+>   suivi, une fois la prod à zéro.
 
 ---
 
