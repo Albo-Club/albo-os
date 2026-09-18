@@ -23,6 +23,40 @@ bas de page.
 
 ---
 
+## v1.245.0 — 18/09/2026 à 22:17 — Une participation sans aucun report est signalée d'emblée
+
+Jusqu'ici, une société qui n'avait **jamais** envoyé de report n'était
+signalée qu'au bout du délai d'alerte (4 mois par défaut), compté depuis le
+versement des fonds. Elle l'est maintenant **tout de suite** : une
+participation doit avoir son état des lieux de départ dès l'entrée, et
+l'absence de tout report est une alerte en soi, pas un silence à laisser
+courir.
+
+Concrètement, la pastille ambre de la liste des participations et le bloc
+« Reportings manquants » de la page À faire disent désormais « Aucun report
+reçu — un état des lieux de départ manque », avec la date du versement des
+fonds. Une communication publiée sur le portail de l'émetteur (SPV Parallel)
+compte toujours comme une nouvelle : un SPV relié à son émetteur n'est pas
+concerné. Le délai d'alerte, lui, ne change pas pour les sociétés qui ont
+déjà reporté au moins une fois. L'assistant IA suit la même règle.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/reportFreshness.ts:listSilentCompanies` : le filtre par seuil
+>   (`cutoff`) ne s'applique plus qu'aux sociétés qui ont une dernière
+>   nouvelle ; sans aucune nouvelle (ni `lastReportAt` ni communication
+>   VASCO), la société est retournée quel que soit le délai. `sinceAt` reste
+>   le premier décaissement pointé (à défaut la date de signature), pour
+>   l'affichage et le tri.
+> - `convex/regression.reportFreshness.test.ts` : le cas « fonds versés il y
+>   a un mois → pas signalée » devient « signalée d'emblée » (deux sociétés,
+>   la plus ancienne en premier, `lastNewsAt` nul) ; le cas « le décaissement
+>   pointé gagne sur la signature » vérifie maintenant `sinceAt`.
+> - Libellés `participations:silence.never`, `todo:reports.neverReported` et
+>   `hint`, `settings:reportSilenceHint` (EN + FR) ; description de l'outil
+>   agent `listSilentCompanies` (`convex/agentToolsReports.ts`).
+> - Docs produit 04, 11, 16 et `TESTING.md` (TD5b, TP8c, C36b) alignés.
+
 ## v1.244.1 — 18/09/2026 à 21:28 — Un seul ⋯ par page dans Investissements
 
 Le réglage des sous-sections rejoint le menu ⋯ **en haut de la page**, sur la

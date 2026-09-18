@@ -8,8 +8,9 @@
  *   the period it covers;
  * - a portal communication counts as news exactly like an emailed report —
  *   an SPV publishes, it does not write;
- * - a company that never gave news is measured from its first disbursement —
- *   funds wired last week owe nothing yet;
+ * - a company that never gave news is flagged right away, whatever the
+ *   threshold — a position owes a baseline report from day one — and dated
+ *   from its first disbursement;
  * - the threshold follows the org's `reportSilenceMonths`;
  * - an exited or archived position never nags.
  */
@@ -26,7 +27,8 @@ import { recordReportOnCompany } from './lib/reportFreshness'
 import type { Harness } from './regression.setup'
 import type { Id } from './_generated/dataModel'
 
-const MONTH = 30 * 24 * 60 * 60 * 1000
+const DAY = 24 * 60 * 60 * 1000
+const MONTH = 30 * DAY
 
 async function orgSetup(slug = 'org-silence') {
   const t = setupHarness()
@@ -167,7 +169,7 @@ describe('report freshness: silent companies', () => {
     expect(await silentNames(user, org.orgId)).toEqual([])
   })
 
-  test('counts a never-reporting company from its first disbursement', async () => {
+  test('flags a never-reporting company right away, whatever the threshold', async () => {
     const { t, user, org } = await orgSetup()
     const now = Date.now()
     const old = await createPortfolioCompany(t, org.orgId, 'Wired long ago')
@@ -186,10 +188,16 @@ describe('report freshness: silent companies', () => {
       org.rootCompanyId,
       recent,
       'active',
-      now - 1 * MONTH,
+      now - 1 * DAY,
     )
 
-    expect(await silentNames(user, org.orgId)).toEqual(['Wired long ago'])
+    // Both owe a baseline report; the longest wait comes first.
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingReports.map((r) => r.companyName)).toEqual([
+      'Wired long ago',
+      'Just wired',
+    ])
+    expect(todo.missingReports.map((r) => r.lastNewsAt)).toEqual([null, null])
   })
 
   test('the reconciled disbursement wins over the signature date', async () => {
@@ -221,7 +229,9 @@ describe('report freshness: silent companies', () => {
       })
     })
 
-    expect(await silentNames(user, org.orgId)).toEqual([])
+    const todo = await user.as.query(api.todo.getTodo, { orgId: org.orgId })
+    expect(todo.missingReports).toHaveLength(1)
+    expect(todo.missingReports[0].sinceAt).toBe(now - 1 * MONTH)
   })
 
   test('follows the org threshold', async () => {

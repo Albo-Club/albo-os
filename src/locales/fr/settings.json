@@ -28,7 +28,7 @@
       "default": "Échec de l'enregistrement"
     },
     "reportSilence": "Alerte reporting (mois)",
-    "reportSilenceHint": "Nombre de mois sans report reçu au-delà duquel une participation est signalée comme silencieuse, dans la liste des participations et l'onglet À faire. Les boîtes qui n'ont jamais reporté sont comptées depuis le versement des fonds."
+    "reportSilenceHint": "Nombre de mois sans report reçu au-delà duquel une participation est signalée comme silencieuse, dans la liste des participations et l'onglet À faire. Une boîte qui n'a jamais donné de nouvelle est signalée d'emblée, quel que soit le délai."
   },
   "members": {
     "title": "Membres",
