@@ -36,6 +36,10 @@
     "too_large": "The file is larger than 20 MB.",
     "default": "Couldn't save the document. Please try again."
   },
+  "placement": {
+    "title": "Documents",
+    "hint": "Structured-product term sheet, account agreement, certificate."
+  },
   "loan": {
     "title": "Documents",
     "hint": "Offer letter, amortization table, deed."

@@ -121,6 +121,19 @@ et il ne couvre pas toutes les banques. Tant qu'il n'est pas disponible pour
 une banque donnée, l'import de relevé est la façon de tenir ces placements à
 jour.
 
+### Les documents du contrat
+
+La fiche porte enfin un bloc **Documents**, sous les nantissements : on y
+dépose le term sheet d'un produit structuré, la convention de compte, une
+attestation de la banque. Le texte de chaque fichier est lu comme partout
+ailleurs dans l'app, donc une clause devient trouvable à la recherche —
+« quelle est la barrière de protection de l'EMTN ? » n'oblige plus à
+rouvrir le PDF.
+
+Ces documents sont rattachés **au placement seul**, pas à la banque qui le
+tient : la fiche de Natixis Wealth Management ne se remplit pas des notes de
+tous les produits qu'elle abrite.
+
 ### Sous le capot : l'historique des soldes
 
 Chaque mise à jour d'un solde est aussi enregistrée comme une valorisation

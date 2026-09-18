@@ -36,6 +36,10 @@
     "too_large": "Le fichier dépasse 20 Mo.",
     "default": "Impossible d’enregistrer le document. Réessayez."
   },
+  "placement": {
+    "title": "Documents",
+    "hint": "Term sheet de produit structuré, convention de compte, attestation."
+  },
   "loan": {
     "title": "Documents",
     "hint": "Offre de prêt, tableau d’amortissement, acte."

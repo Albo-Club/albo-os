@@ -22,6 +22,7 @@ import { xirr } from '~/lib/xirr'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { KpiCard } from '~/components/placements/KpiCard'
 import { DealPledgesSection } from '~/components/passif/DealPledgesSection'
+import { DocumentsSection } from '~/components/documents/DocumentsSection'
 import { Badge } from '~/components/ui/badge'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { Button } from '~/components/ui/button'
@@ -59,6 +60,20 @@ export const Route = createFileRoute('/app/$orgSlug/placements/$dealId')({
   }),
 })
 
+/**
+ * Kinds offered on a placement, most likely first. A structured product's
+ * term sheet is `term_sheet`, a custody or account agreement is `legal`, a
+ * bank certificate is `attestation`; anything else is `other`. No
+ * placement-specific kind was added: the schema's union is already wider
+ * than any surface offers, and a fifth label no filter reads sorts nothing.
+ */
+const PLACEMENT_DOC_KINDS = [
+  'term_sheet',
+  'legal',
+  'attestation',
+  'other',
+] as const
+
 function NotFound() {
   const { t } = useTranslation('placements')
   const { orgSlug } = Route.useParams()
@@ -84,7 +99,11 @@ function NotFound() {
  * transactions.
  */
 function PlacementDetail() {
-  const { t, i18n } = useTranslation(['placements', 'participations'])
+  const { t, i18n } = useTranslation([
+    'placements',
+    'participations',
+    'documents',
+  ])
   const { orgSlug, dealId } = Route.useParams()
   const { fmtEurCents, fmtDate, fmtPercent } = useFormatters()
   // A quantity of securities is not money — plain localized number, up to
@@ -108,6 +127,9 @@ function PlacementDetail() {
     dealId: dealId as Id<'deals'>,
   })
   const valuations = useConvexQuery(api.valuations.list, {
+    dealId: dealId as Id<'deals'>,
+  })
+  const documents = useConvexQuery(api.documents.listByDeal, {
     dealId: dealId as Id<'deals'>,
   })
   const updateDeal = useConvexMutation(api.deals.update)
@@ -555,6 +577,13 @@ function PlacementDetail() {
       </section>
 
       <DealPledgesSection dealId={deal._id} />
+
+      <DocumentsSection
+        anchor={{ kind: 'deal', dealId: deal._id }}
+        docs={documents}
+        kinds={PLACEMENT_DOC_KINDS}
+        title={t('documents:placement.title')}
+      />
 
       <section className="space-y-3">
         <h2 className="text-sm font-medium">{t('fiche.tx.title')}</h2>

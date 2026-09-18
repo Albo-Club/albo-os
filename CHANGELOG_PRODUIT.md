@@ -23,6 +23,43 @@ bas de page.
 
 ---
 
+## v1.241.0 — 18/09/2026 à 18:03 — Les documents d'un placement vivent sur son contrat
+
+La fiche d'un placement porte désormais un bloc **Documents**, sous les
+nantissements — le même que sur un prêt ou un bien immobilier. On y dépose le
+term sheet d'un produit structuré, la convention de compte, une attestation
+de la banque : quatre types proposés (term sheet, juridique, attestation,
+autre), le titre et la date se corrigent après coup, et le texte du fichier
+est lu comme partout ailleurs. Une clause devient donc trouvable à la
+recherche sans rouvrir le PDF.
+
+Le document est rattaché **au placement seul**, pas à la banque qui le tient :
+la fiche de l'établissement ne se remplit pas des notes de tous les produits
+qu'elle abrite. Ajout et retrait apparaissent dans le journal d'activité,
+comme pour n'importe quel document de deal.
+
+> **🔧 Notes techniques**
+>
+> - `documents:listByDeal` (`convex/documents.ts`), calquée sur `listByLoan` :
+>   lecture par `by_deal`, `requireOrgMember` sur l'org du deal, même
+>   projection que les trois autres ancres puisqu'elles alimentent le même
+>   composant.
+> - Front : cas `'deal'` dans `DocumentAnchor` (`AddFilesDialog.tsx`) et
+>   montage de `DocumentsSection` dans `placements.$dealId.tsx` avec
+>   `PLACEMENT_DOC_KINDS`. Clés i18n `documents:placement.*` (fr + en).
+> - Aucun changement de schéma ni de mutation : `documents:create` acceptait
+>   déjà `dealId` comme **seule** ancre (résolution de l'org dans cet ordre :
+>   company, loan, property, deal), l'index `by_deal` existait, et le
+>   journal (`logDealEvent` sur `document_attached` / `document_removed`)
+>   était déjà branché côté deal.
+> - Le document ne porte volontairement **pas** de `companyId` : il reste
+>   donc invisible à l'index `by_company` (il ne remonte pas sur la fiche de
+>   la banque) et, côté RAG, il est indexé dans l'org sans valeur de filtre
+>   `companyId` — trouvable sans filtre, exclu d'une recherche restreinte à
+>   une société.
+
+---
+
 ## v1.240.0 — 18/09/2026 à 14:50 — L'assistant montre ce qu'il fait pendant qu'il cherche
 
 Pendant qu'une réponse se construit, le panneau IA affichait le nom
