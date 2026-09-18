@@ -475,7 +475,8 @@ export const mcpTools: Array<McpTool> = [
       'The AI synthesis of a portfolio company, computed from its reports: ' +
       'executive summary, health score (1-10 with good/bad points), top ' +
       'insights and alerts. Returns null when no synthesis exists yet. ' +
-      'latestReportId points at the report it was last refreshed from.',
+      'latestReportId points at the report it was last refreshed from; ' +
+      'scoreEvolution gives the previous score (null on a first score).',
     schema: { org: orgSlug, companyId: z.string() },
     run: async (ctx, actorUserId, { org, companyId }) =>
       await ctx.runQuery(internal.intelligence.getByCompanyInternal, {
@@ -842,10 +843,15 @@ export const mcpTools: Array<McpTool> = [
       siren: z.string().optional().describe('9 digits, or "" to clear'),
       legalForm: z.string().optional(),
       totalShares: z.number().optional(),
+      incorporationDateISO: isoDateArg('Incorporation date'),
       notes: z.string().optional(),
     },
     write: true,
-    run: async (ctx, actorUserId, { org, companyId, ...patch }) => {
+    run: async (
+      ctx,
+      actorUserId,
+      { org, companyId, incorporationDateISO, ...patch },
+    ) => {
       const orgId = await orgIdFor(ctx, actorUserId, org)
       const updated = await ctx.runMutation(
         internal.agentTools.updateCompanyInternal,
@@ -853,6 +859,7 @@ export const mcpTools: Array<McpTool> = [
           orgId,
           actorUserId,
           companyId: companyId as Id<'companies'>,
+          incorporationDate: optionalISODate(incorporationDateISO),
           ...patch,
         },
       )
@@ -944,6 +951,11 @@ export const mcpTools: Array<McpTool> = [
         .enum(['active', 'fully_exited', 'written_off', 'cancelled'])
         .optional(),
       ...dealValueSchema,
+      spvOwnershipPct: bpsArg('Stake held in the SPV — spv_share deals only'),
+      attioDealId: z
+        .string()
+        .optional()
+        .describe('Attio deal record id (the CRM bridge); "" clears it'),
     },
     write: true,
     run: async (

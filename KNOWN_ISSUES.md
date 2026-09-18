@@ -1383,9 +1383,12 @@ Pièges et décisions :
    - **Aucun blocage sur doublon**, seulement des avertissements
      (`possibleDuplicates`, `convex/lib/duplicates.ts`). Sans écran de
      revue, bloquer une création sur une heuristique de nom coûterait plus
-     cher que la corriger. Seule exception : `assertSirenFree`, invariant
-     de données déjà appliqué partout ailleurs — le chemin MCP ne doit pas
-     ouvrir de porte dérobée autour.
+     cher que la corriger. Deux exceptions, toutes deux des invariants de
+     données et non des heuristiques : `assertSirenFree` (déjà appliqué
+     partout ailleurs) et l'unicité de `attioDealId` sur `updateDeal`
+     (`attio_deal_id_already_used` — la sync webhook upserte sur cette
+     clé, deux deals qui la partagent la rendraient ambiguë). Le chemin MCP
+     ne doit pas ouvrir de porte dérobée autour.
    - **Pas de mutation dupliquée** : les internes de `convex/agentTools.ts`
      sont élargis en champs optionnels plutôt que recopiés côté MCP, pour
      garder une seule implémentation des garde-fous

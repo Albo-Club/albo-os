@@ -22,6 +22,9 @@ import {
 } from './_generated/server'
 import { getModel } from './agent'
 import { intelligenceTools } from './agentToolsIntelligence'
+import { aiHealthScore } from './deals'
+import { logCompanyEvent } from './lib/companyEvents'
+import { latestScoreEvolution } from './lib/scoreEvolution'
 import { INTELLIGENCE_SYSTEM_PROMPT } from './lib/reportPrompts'
 import { readMembership } from './lib/agentScope'
 import { requireOrgMember } from './lib/auth'
@@ -147,6 +150,32 @@ export const upsertIntelligence = internalMutation({
     }
     if (args.latestReportId !== undefined) patch.latestReportId = args.latestReportId
 
+    // Every completed synthesis that yields a score journals it, changed or
+    // not — the journal is the score's history (ALB-252). `existing` still
+    // holds the previous analysis here: `processing` only flips the status.
+    const to = args.status === 'completed' ? aiHealthScore(args.analysis) : null
+    if (to !== null) {
+      const latestReport = await ctx.db
+        .query('companyReports')
+        .withIndex('by_company', (q) => q.eq('companyId', args.companyId))
+        .order('desc')
+        .first()
+      const label = (args.analysis as { health_score?: { label?: unknown } })
+        .health_score?.label
+      await logCompanyEvent(
+        ctx,
+        { orgId: args.orgId, companyId: args.companyId },
+        { kind: 'system', source: 'intelligence' },
+        {
+          kind: 'score_updated',
+          from: aiHealthScore(existing?.aiAnalysis) ?? undefined,
+          to,
+          label: typeof label === 'string' ? label : undefined,
+          reportLabel: latestReport?.reportPeriod ?? latestReport?.title,
+        },
+      )
+    }
+
     if (existing) {
       await ctx.db.patch("companyIntelligence", existing._id, patch)
       return existing._id
@@ -177,6 +206,7 @@ export const getByCompany = query({
       aiAnalysis: intel.aiAnalysis ?? null,
       aiAnalysisStatus: intel.aiAnalysisStatus ?? null,
       aiAnalysisUpdatedAt: intel.aiAnalysisUpdatedAt ?? null,
+      scoreEvolution: await latestScoreEvolution(ctx, companyId),
     }
   },
 })
@@ -204,6 +234,9 @@ export const getByCompanyInternal = internalQuery({
       aiAnalysis: intel.aiAnalysis ?? null,
       aiAnalysisStatus: intel.aiAnalysisStatus ?? null,
       aiAnalysisUpdatedAt: intel.aiAnalysisUpdatedAt ?? null,
+      // Before → after of the latest synthesis (null: never scored since the
+      // journal records scores; previousScore null: first score).
+      scoreEvolution: await latestScoreEvolution(ctx, companyId),
       // Chains into getCompanyReport for the report behind the synthesis.
       latestReportId: intel.latestReportId ?? null,
     }

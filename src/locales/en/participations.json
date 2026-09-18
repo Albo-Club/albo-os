@@ -356,6 +356,7 @@
     "actor": {
       "attio": "Attio",
       "vasco": "Parallel",
+      "intelligence": "AI synthesis",
       "unknown": "Albo OS"
     },
     "field": {
@@ -405,6 +406,11 @@
       "vasco_unlinked": "unlinked the company from its Parallel issuer",
       "kpi_added": "added the {{metric}} KPI as of {{date}} · {{value}}",
       "kpi_removed": "removed the {{metric}} KPI as of {{date}}",
+      "score_updated_first": "scored the company's health {{to}}/10 (first score)",
+      "score_updated_up": "raised the health score from {{from}} to {{to}}/10",
+      "score_updated_down": "lowered the health score from {{from}} to {{to}}/10",
+      "score_updated_same": "kept the health score at {{to}}/10",
+      "score_updated_after": ", after the “{{label}}” report",
       "projection_replaced_one": "replaced the {{version}} BP of {{deal}} ({{count}} line)",
       "projection_replaced_other": "replaced the {{version}} BP of {{deal}} ({{count}} lines)",
       "rule_created": "added the “{{label}}” rule ({{amount}} {{frequency}}) on {{deal}}",
@@ -646,7 +652,13 @@
     "synthesis": {
       "header": "AI synthesis · latest report",
       "generatedAt": "Generated {{date}}",
-      "scoreValue": "Score {{score}}/10"
+      "scoreValue": "Score {{score}}/10",
+      "evolution": {
+        "first": "First score",
+        "up": "↑ Before: {{score}}/10",
+        "down": "↓ Before: {{score}}/10",
+        "same": "→ Unchanged"
+      }
     },
     "verdict": {
       "good": "On track",

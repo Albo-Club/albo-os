@@ -46,10 +46,13 @@ function collapseSystemRuns(rows: Array<Row>): Array<Visible> {
   const out: Array<Visible> = []
   for (const row of rows) {
     const last = out.at(-1)
+    // Same source only: a score written by the synthesis right after a
+    // Parallel publication is two different voices, not one burst.
     if (
       last &&
       row.actor.kind === 'system' &&
-      last.row.actor.kind === 'system'
+      last.row.actor.kind === 'system' &&
+      row.actor.source === last.row.actor.source
     ) {
       last.collapsed += 1
     } else {
@@ -365,6 +368,26 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
         date: fmtDate(event.periodEnd),
       })
       break
+    case 'score_updated': {
+      const dir =
+        event.from === undefined
+          ? 'first'
+          : event.to > event.from
+            ? 'up'
+            : event.to < event.from
+              ? 'down'
+              : 'same'
+      text =
+        t(`activity.ev.score_updated_${dir}`, {
+          from: event.from,
+          to: event.to,
+        }) +
+        (event.label ? ` · ${event.label}` : '') +
+        (event.reportLabel
+          ? t('activity.ev.score_updated_after', { label: event.reportLabel })
+          : '')
+      break
+    }
     case 'projection_replaced':
       text = t('activity.ev.projection_replaced', {
         deal: DEAL_TOKEN,

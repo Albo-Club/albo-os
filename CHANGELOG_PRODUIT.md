@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.245.0 — 18/09/2026 à 22:40 — Banques cloisonnées par défaut, liens entre organisations déclarés
+## v1.246.0 — 18/09/2026 à 22:40 — Banques cloisonnées par défaut, liens entre organisations déclarés
 
 Jusqu'ici, l'app décidait toute seule qu'un compte Palatine était forcément
 à CALTE et qu'un compte Mémo Bank était forcément à Albo Club : une liste
@@ -88,6 +88,78 @@ détient l'accès bancaire, puis un humain le rattache.
 >   the first », cas `sameBank` dans `tests/powensAccounts.test.ts`.
 > - Pas d'outil agent ni MCP : un lien est un réglage de sécurité admin, hors
 >   des deux façades IA (décision explicite).
+
+---
+
+## v1.245.0 — 18/09/2026 à 22:27 — La note de santé garde son histoire
+
+La note de santé d'une boîte ne s'effaçait plus à chaque nouveau report :
+elle était simplement remplacée, et rien ne disait si la boîte remontait ou
+reculait. Désormais **chaque synthèse laisse une trace**, et les quatre
+endroits qui montrent la note disent d'où elle vient.
+
+- **Fiche société, bloc Synthèse IA** : à côté du score, « ↑ Avant : 6/10 ·
+  T1 2026 » en vert quand la boîte remonte, « ↓ Avant : 6/10 · T1 2026 » en
+  rouge quand elle recule, « → Inchangée · T1 2026 » quand le report n'a
+  rien changé, « Première note » la première fois. La période est celle du
+  report sur lequel la note d'avant avait été calculée.
+- **Fiche société, Activité** : une ligne « Synthèse IA » à chaque synthèse,
+  même quand la note ne bouge pas — notée, relevée de 6 à 7, abaissée de 8 à
+  6, maintenue à 6 — avec le verdict et le report qui l'a déclenchée. Lue de
+  haut en bas, la colonne raconte toute l'évolution de la boîte.
+- **Mail après un report** (et l'annonce d'une publication Parallel) : la
+  même ligne sous le verdict de la carte « où en est la boîte ».
+- **Point hebdo du lundi** : sous la puce de chaque carte de report, « ↑
+  Avant : 6/10 » ou « → Inchangée » ; rien pour une première note.
+
+L'histoire commence aujourd'hui : les notes déjà en place n'ont pas de
+passé, la ligne « Avant » apparaît à partir de la prochaine synthèse.
+
+> **🔧 Notes techniques**
+>
+> - Nouvel événement de journal `score_updated` (`from?`, `to`, `label`,
+>   `reportLabel`) dans `convex/schema.ts`, écrit par
+>   `intelligence.upsertIntelligence` à chaque `completed` qui porte un score
+>   — changé ou non, c'est le seul historique du score. Acteur système
+>   `source: 'intelligence'` (nouvelle valeur de `companyEventActor`).
+> - `convex/lib/scoreEvolution.ts` : `latestScoreEvolution` relit le journal
+>   (dernier `score_updated` → `previousScore`, le précédent →
+>   `previousReportLabel`) et `scoreDirection` classe first/up/down/same.
+>   Une seule lecture pour la fiche (`intelligence.getByCompany` et la
+>   variante agent/MCP renvoient `scoreEvolution`), le mail de confirmation
+>   (`reportNotify.entityCards` → `ReportSynthesis.evolution`) et le digest
+>   (`forecasts` → `DigestReportItem.evolution`).
+> - `emailTemplates.ts` : `scoreEvolutionLine` partagé entre `synthesisCard`
+>   (avec période) et `reportCard` (sans, muet sur une première note).
+> - Front : `CompanyAiSynthesisBlock` (clés `reports.synthesis.evolution.*`),
+>   `CompanyActivitySection` (clés `activity.ev.score_updated_*`, acteur
+>   `activity.actor.intelligence`) ; le repli des lignes système ne joue plus
+>   qu'entre lignes de **même source**, sinon la note aurait avalé la
+>   publication Parallel qui la précède.
+> - Tests : `regression.companyEvents.test.ts` (trois synthèses, relecture
+>   before/after), `tests/reportEmail.test.ts` (les quatre cas de la ligne).
+
+## v1.244.2 — 18/09/2026 à 22:05 — Connecteur Claude : trois champs de plus à compléter
+
+Depuis claude.ai, le connecteur peut désormais compléter sur un deal la
+**quote-part détenue dans le SPV** et le **lien vers la fiche Attio**, et sur
+une société sa **date de création**. Ces trois cases restaient à saisir à la
+main dans l'app (et le lien Attio n'était saisissable nulle part) quand on
+complétait le portefeuille depuis le CRM. Un lien Attio déjà porté par un
+autre deal est refusé, pour ne jamais rendre la synchronisation ambiguë.
+
+> **🔧 Notes techniques**
+>
+> - `convex/agentTools.ts` : `updateDealInternal` accepte `spvOwnershipPct`
+>   (bps) et `attioDealId` (trim, `''` efface, unicité vérifiée sur l'index
+>   `by_attio_deal_id` → `attio_deal_id_already_used`) ;
+>   `updateCompanyInternal` accepte `incorporationDate` (ms).
+> - `convex/mcp/registry.ts` : `updateDeal` expose les deux champs (hors
+>   `dealValueSchema`, partagé avec `createDeal` dont l'interne ne les prend
+>   pas) ; `updateCompany` expose `incorporationDateISO`, converti en ms.
+> - Test `convex/regression.deals.test.ts` (écriture, unicité, effacement,
+>   date de création) ; `TESTING.md` M35 ; `KNOWN_ISSUES.md` § MCP point 7
+>   (seconde exception bloquante).
 
 ---
 

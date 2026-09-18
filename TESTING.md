@@ -1415,6 +1415,7 @@ en place derrière lui : c'est l'amont, plus une URL à documenter.
 
 | M33 | `tools/call listDeals {org:"calte"}` puis `getDeal {org:"calte", dealId:<un deal actions>}`, puis `getDeal` sur le deal de CALTE vers une **filiale** (SCI, Albo…) | La liste porte `name` et `ownershipPct` par deal ; la fiche rend **toute la ligne** (actions, prix par action, tour, pré/post-money, taux, échéance, cap/discount, part de SPV…) sans `airtableId` ni `manuallyEditedFields`, les noms investisseur/cible/SPV, et `ownership {bps, source}` — `source: "deal"` sur une participation, `"cap_table"` (avec `issuingOrgSlug`) sur la filiale : le même % que l'en-tête de la fiche société. Un `dealId` d'une autre org → `isError` `not_found` |
 | M34 | `tools/call listLiabilities {org:"sci-chapelle"}` | Chaque position de capital porte `ownershipBps` (null si non saisi) et `holderOrgSlug` (`"calte"` pour la part détenue par CALTE, null pour un tiers) |
+| M35 | `tools/call updateDeal {org, dealId:<un deal spv_share>, spvOwnershipPct:650, attioDealId:"<record id Attio>"}`, puis le même `attioDealId` sur un **autre** deal, puis `updateCompany {org, companyId, incorporationDateISO:"2012-01-01"}` | La fiche SPV affiche 6,5 % de quote-part et le deal est relié à Attio ; le second appel → `isError` `attio_deal_id_already_used`, rien n'est écrit ; la date de création apparaît sur la fiche société. `attioDealId:""` retire le lien |
 
 > Nettoyage : archiver/supprimer dans l'app les sociétés et deals « Zzz Test »
 > créés par M13-M20, ainsi que les sûretés, étapes de taux, avenants et

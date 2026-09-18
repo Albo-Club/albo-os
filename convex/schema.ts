@@ -109,7 +109,12 @@ export const companyEventActor = v.union(
   }),
   v.object({
     kind: v.literal('system'),
-    source: v.union(v.literal('attio'), v.literal('vasco')),
+    source: v.union(
+      v.literal('attio'),
+      v.literal('vasco'),
+      // The AI synthesis (Cerveau 3) scoring the company's health.
+      v.literal('intelligence'),
+    ),
   }),
   v.object({ kind: v.literal('unknown') }),
 )
@@ -232,6 +237,19 @@ export const companyEvent = v.union(
     kind: v.literal('kpi_removed'),
     metricType: v.string(),
     periodEnd: v.number(),
+  }),
+  // The AI health score, written at EVERY completed synthesis — including
+  // one that leaves the score where it was: the journal is the score's only
+  // history, and "unchanged after the Q2 report" is a fact the fiche and the
+  // mails read back (ALB-252). `from` is absent on a first score; `label` is
+  // the verdict the model wrote ("En bonne voie"); `reportLabel` is the
+  // latest report the synthesis ran on.
+  v.object({
+    kind: v.literal('score_updated'),
+    from: v.optional(v.number()),
+    to: v.number(),
+    label: v.optional(v.string()),
+    reportLabel: v.optional(v.string()),
   }),
   // A deal's business plan replaced as a whole (one version at a time).
   v.object({

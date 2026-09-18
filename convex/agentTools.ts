@@ -544,6 +544,10 @@ export const updateDealInternal = internalMutation({
     fundType: v.optional(fundTypeValidator),
     vintageYear: v.optional(v.number()),
     managementCompany: v.optional(v.string()),
+    spvOwnershipPct: v.optional(v.number()), // bps — stake in the SPV
+    // Attio bridge. '' clears it; a value already carried by another deal
+    // of the org is refused — the webhook sync upserts on this key.
+    attioDealId: v.optional(v.string()),
     // Date of the conversion, when the caller changes `instrumentKind`.
     // `convertedFromKind` is never an argument — it is read from the row.
     convertedAt: v.optional(v.number()), // ms epoch
@@ -554,6 +558,21 @@ export const updateDealInternal = internalMutation({
     if (!deal || deal.orgId !== orgId) throw new ConvexError('not_found')
     if (patch.viaSpvCompanyId) {
       await assertSameOrg(ctx, orgId, patch.viaSpvCompanyId, 'spv_wrong_org')
+    }
+    if (patch.attioDealId !== undefined) {
+      patch.attioDealId = patch.attioDealId.trim() || undefined
+      if (patch.attioDealId) {
+        const attioDealId = patch.attioDealId
+        const holder = await ctx.db
+          .query('deals')
+          .withIndex('by_attio_deal_id', (q) =>
+            q.eq('attioDealId', attioDealId),
+          )
+          .first()
+        if (holder && holder._id !== dealId) {
+          throw new ConvexError('attio_deal_id_already_used')
+        }
+      }
     }
     // Same rule as `deals.update`: a change of instrument type IS a
     // conversion, and the type left behind is recorded so the deal sheet can
@@ -1083,6 +1102,7 @@ export const updateCompanyInternal = internalMutation({
     siren: v.optional(v.string()),
     legalForm: v.optional(v.string()),
     totalShares: v.optional(v.number()),
+    incorporationDate: v.optional(v.number()), // ms epoch
   },
   handler: async (ctx, { orgId, actorUserId, companyId, ...patch }) => {
     await readMembership(ctx, orgId, actorUserId)
