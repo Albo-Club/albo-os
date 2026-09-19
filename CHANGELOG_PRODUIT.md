@@ -70,6 +70,46 @@ retrait s'inscrit dans l'Activité de la fiche.
 
 ---
 
+## v1.247.2 — 19/09/2026 à 11:10 — L'historique des notes de santé se reconstitue depuis le 07/08
+
+La note de santé garde son histoire depuis hier, mais elle partait de zéro :
+les notes d'avant avaient été écrasées à chaque synthèse. Elles n'étaient pas
+perdues pour autant — chaque synthèse laisse une trace complète dans les
+coulisses de l'assistant. Une opération à lancer une fois par Clément relit
+ces traces et remet dans l'**Activité** de chaque société une ligne par
+synthèse passée, avec sa note, son verdict et le report qui l'a déclenchée.
+La ligne « Avant : x/10 » de la fiche, du mail post-report et du point hebdo
+s'appuie dessus dès l'opération faite.
+
+Seules les synthèses depuis le **07/08/2026** sont reprises : c'est la date
+du barème actuel, et une note d'avant cette date ne se compare pas à une note
+d'après.
+
+> **🔧 Notes techniques**
+>
+> - `convex/migrations/backfillScoreHistory.ts` : `dryRun` / `apply`
+>   (actions internes). Parcourt `components.agent.threads.listThreadsByUserId`
+>   pour `<orgId>:system` sur chaque org, ne garde que les fils
+>   `Intelligence — <companyId>` créés après `RUBRIC_SINCE` (07/08/2026
+>   13:57 UTC), lit le dernier message assistant via `listMessages` et en
+>   extrait `health_score` (`intelligence.extractJson`, désormais exporté, +
+>   `deals.aiHealthScore`).
+> - `recordThread` (mutation interne) écrit la ligne `score_updated` datée
+>   du fil : `from` = dernière ligne `score_updated` antérieure, `reportLabel`
+>   = dernier `companyReports` stocké au plus tard à cette date. Idempotent
+>   par `backfillKey = score:<threadId>` ; refuse un fil dont la société
+>   n'est pas de l'org ; s'arrête avant la première ligne native (sans
+>   `backfillKey`) de la société, marge 15 min.
+> - `convex/regression.scoreHistoryBackfill.test.ts` enregistre le composant
+>   agent dans le harnais (`@convex-dev/agent/test`) : rejeu, chaînage,
+>   idempotence, arrêt sur le natif.
+> - `convex/_generated/api.d.ts` régénéré via un déploiement local anonyme ;
+>   le fichier versionné avait pris du retard (modules `lib/*` et plusieurs
+>   migrations absents), le diff les rattrape.
+> - Runbook dans `MIGRATIONS.md`.
+
+---
+
 ## v1.247.1 — 18/09/2026 à 23:25 — Le backfill documentaire ne confond plus le tour suivant avec le tour d'entrée
 
 Quand une société a levé de nouveau après notre entrée, ses documents
