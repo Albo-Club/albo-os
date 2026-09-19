@@ -15,6 +15,9 @@
  * A proposal and a refusal are automatic bookkeeping and stay out of the
  * journal; the confirmation is the human gesture and is journaled under the
  * confirming user (cf. tests/journalGuards.test.ts EXEMPT).
+ *
+ * A confirmed operation also VALUES our share deals in the company (lot 3):
+ * see `deriveValuations`.
  */
 import { ConvexError, v } from 'convex/values'
 import {
@@ -25,9 +28,13 @@ import {
 } from './_generated/server'
 import { readMembership } from './lib/agentScope'
 import { requireOrgMember } from './lib/auth'
-import { capitalEventKindValidator } from './lib/capitalPosition'
-import { logCompanyEvent, userActor } from './lib/companyEvents'
+import {
+  CAPITAL_EVENT_VALUATION_SOURCE,
+  capitalEventKindValidator,
+} from './lib/capitalPosition'
+import { logCompanyEvent, logDealEvent, userActor } from './lib/companyEvents'
 import { roundTypeValidator } from './lib/instruments'
+import { isTerminalStatus } from './lib/metrics'
 
 import type { Doc, Id } from './_generated/dataModel'
 import type { MutationCtx, QueryCtx } from './_generated/server'
@@ -90,6 +97,63 @@ async function assertDocumentOfCompany(
   throw new ConvexError('document_not_found')
 }
 
+/**
+ * A confirmed operation IS a valuation of our share deals in the company:
+ * shares held × the round's price, dated the day of the round. Written as
+ * ordinary `valuations` rows (source `capital_event`, linked through
+ * `capitalEventId`) so every reader of "the last valuation" — TVPI, NAV,
+ * pledge margins, both AI facades — picks it up without knowing about capital
+ * events. Same pattern as the fund statements (convex/statements.ts). Skipped
+ * for a deal without a share count, already exited, or entered after the
+ * round (we did not hold the shares yet). Idempotent per (operation, deal).
+ * Each row is journaled on its deal as an ordinary `valuation_added`.
+ */
+async function deriveValuations(
+  ctx: MutationCtx,
+  row: Doc<'capitalEvents'>,
+  userId: Id<'users'>,
+  viaAgent: boolean,
+) {
+  const deals = await ctx.db
+    .query('deals')
+    .withIndex('by_org_target', (q) =>
+      q.eq('orgId', row.orgId).eq('targetCompanyId', row.companyId),
+    )
+    .collect()
+  const already = new Set(
+    (
+      await ctx.db
+        .query('valuations')
+        .withIndex('by_capital_event', (q) => q.eq('capitalEventId', row._id))
+        .collect()
+    ).map((valuation) => valuation.dealId),
+  )
+  for (const deal of deals) {
+    if (deal.instrumentKind !== 'share' || isTerminalStatus(deal.status)) {
+      continue
+    }
+    const shares = deal.sharesAcquired ?? 0
+    if (shares <= 0 || already.has(deal._id)) continue
+    const entered = deal.closingDate ?? deal.signedDate
+    if (entered != null && entered > row.asOf) continue
+    const fairValue = Math.round(shares * row.pricePerShare)
+    await ctx.db.insert('valuations', {
+      orgId: row.orgId,
+      dealId: deal._id,
+      asOf: row.asOf,
+      fairValue,
+      valuationMethod: 'last_round',
+      source: CAPITAL_EVENT_VALUATION_SOURCE,
+      capitalEventId: row._id,
+    })
+    await logDealEvent(ctx, deal, userActor(userId, viaAgent), {
+      kind: 'valuation_added',
+      asOf: row.asOf,
+      fairValueCents: fairValue,
+    })
+  }
+}
+
 async function insertConfirmed(
   ctx: MutationCtx,
   company: Doc<'companies'>,
@@ -123,6 +187,8 @@ async function insertConfirmed(
     pricePerShareCents: args.pricePerShare,
     totalSharesAfter: args.totalSharesAfter,
   })
+  const inserted = await ctx.db.get('capitalEvents', id)
+  if (inserted) await deriveValuations(ctx, inserted, userId, viaAgent)
   return id
 }
 
@@ -213,6 +279,8 @@ async function confirmRow(
       totalSharesAfter: row.totalSharesAfter,
     },
   )
+  const confirmed = await ctx.db.get('capitalEvents', row._id)
+  if (confirmed) await deriveValuations(ctx, confirmed, userId, viaAgent)
 }
 
 /** A refused proposal stays as a hidden row: the extractor reads it as
@@ -236,6 +304,15 @@ export const remove = mutation({
     if (!row) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, row.orgId)
     await ctx.db.delete('capitalEvents', eventId)
+    // The valuations this operation derived go with it; their removal rides
+    // the `capital_event_removed` line below.
+    const derived = await ctx.db
+      .query('valuations')
+      .withIndex('by_capital_event', (q) => q.eq('capitalEventId', eventId))
+      .collect()
+    for (const valuation of derived) {
+      await ctx.db.delete('valuations', valuation._id)
+    }
     // A proposal never entered the journal; only a confirmed row leaves it.
     if (row.status === undefined) {
       await logCompanyEvent(

@@ -956,5 +956,42 @@
     "lastComm_other": "Last communication {{count}} months ago",
     "never": "No report received — a baseline report is missing (funds wired on {{date}})",
     "coverage": "Covered through {{date}}"
+  },
+  "valuation": {
+    "title": "Valuation",
+    "adjust": "Adjust",
+    "empty": "No valuation yet: the line is worth what was paid. A round confirmed under “Capital and valuation” or a manual adjustment sets it.",
+    "col": {
+      "date": "Date",
+      "fairValue": "Line value",
+      "method": "Method",
+      "source": "Source"
+    },
+    "method": {
+      "last_round": "Last round",
+      "impairment": "Impairment",
+      "manual": "Manual",
+      "mark_to_market": "Mark to market"
+    },
+    "source": {
+      "capital_event": "Capital operation",
+      "manual": "Manual entry",
+      "statement_import": "Imported statement",
+      "balance_update": "Balance update"
+    },
+    "dialog": {
+      "title": "Adjust the valuation",
+      "description": "Sets the current value of the line at the chosen date. An impairment prevails until the next confirmed round.",
+      "asOf": "Date",
+      "method": "Method",
+      "fairValue": "Line value (€)",
+      "notes": "Note (optional)"
+    },
+    "saved": "Valuation saved",
+    "errors": {
+      "default": "Could not save the valuation.",
+      "invalid_amount": "The amount must be strictly positive.",
+      "invalid_date": "Invalid date."
+    }
   }
 }

@@ -23,6 +23,19 @@ bas de page.
 
 ---
 
+## v1.251.0 — 19/09/2026 à 15:50 — Un tour confirmé valorise la ligne
+
+Un tour de table confirmé dans « Capital et valorisation » fixe désormais la valeur de nos lignes en actions dans la société : titres détenus × nouveau prix, à la date du tour. Cette valeur devient la valorisation courante du deal — celle que lisent le TVPI de la liste des participations, la marge des nantissements et l'assistant IA. Supprimer l'opération ramène la valorisation d'avant. Un deal sans nombre d'actions renseigné, déjà sorti, ou entré après le tour n'est pas touché.
+
+Sur la fiche d'un deal en actions, une nouvelle section « Valorisation » montre l'historique (date, valeur, méthode, source) et permet d'**ajuster** la valeur à la main : une **dépréciation** ou une valorisation manuelle, datée, prend le dessus jusqu'au prochain tour confirmé.
+
+> **🔧 Notes techniques**
+>
+> - `convex/capitalEvents.ts` `deriveValuations` : à la confirmation (ou à la création directe) d'une opération, une ligne `valuations` par deal `share` non terminal de la société (`sharesAcquired × pricePerShare`, `asOf` du tour, `valuationMethod: 'last_round'`, `source: 'capital_event'`, `capitalEventId`), journalisée `valuation_added` sur le deal ; `remove` supprime les lignes dérivées (index `by_capital_event`). Même patron que `statements.ts` : une ligne écrite au bon moment, lue par tous les lecteurs de « dernière valorisation » sans les toucher.
+> - `convex/schema.ts` : `valuations.capitalEventId` + index `by_capital_event` ; `convex/lib/capitalPosition.ts` : `CAPITAL_EVENT_VALUATION_SOURCE`.
+> - Front : `src/components/deals/ValuationSection.tsx` (historique + dialogue « Ajuster la valorisation » → `valuations.create`, méthode `impairment` / `manual`, source `manual`), monté dans `deals.$dealId.tsx` pour les deals `share`. Libellés `participations:valuation.*` (en/fr).
+> - Tests : trois cas dans `convex/regression.capitalEvents.test.ts` (dérivation lue par la liste des deals et le journal ; proposition → confirmation → suppression, idempotence ; deals ignorés).
+
 ## v1.250.2 — 19/09/2026 à 15:21 — Ménage : le backend de l'ancien tableau de bord s'en va
 
 Rien ne change dans l'application. Le calcul qui alimentait l'ancien tableau

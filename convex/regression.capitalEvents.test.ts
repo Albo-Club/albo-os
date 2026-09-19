@@ -477,6 +477,103 @@ describe('capitalEventsExtract: which documents are read', () => {
   })
 })
 
+describe('capitalEvents: a confirmed operation values our share deals', () => {
+  const round = { ...december, pricePerShare: 120_00 }
+
+  test('a hand-entered round writes a last_round valuation on the share deal, read by the deals list and the journal', async () => {
+    const base = await setupWithShareDeal('org-capital-valuation')
+    const { user, org, target, dealId } = base
+    await user.as.mutation(api.capitalEvents.create, {
+      companyId: target,
+      ...round,
+    })
+    const rows = await user.as.query(api.valuations.list, { dealId })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({
+      asOf: round.asOf,
+      fairValue: 313 * 120_00,
+      valuationMethod: 'last_round',
+      source: 'capital_event',
+    })
+    const listed = await user.as.query(api.deals.list, { orgId: org.orgId })
+    expect(listed.find((d) => d._id === dealId)?.lastValuationCents).toBe(
+      313 * 120_00,
+    )
+    const journal = await user.as.query(api.companyEvents.listByCompany, {
+      companyId: target,
+    })
+    expect(
+      journal.filter((r) => r.event.kind === 'valuation_added'),
+    ).toHaveLength(1)
+  })
+
+  test('a proposal values nothing until confirmed, and removing the operation takes the valuation with it', async () => {
+    const base = await setupWithShareDeal('org-capital-valuation-flow')
+    const { t, user, org, target, dealId } = base
+    const eventId = await t.run(async (ctx) =>
+      ctx.db.insert('capitalEvents', {
+        orgId: org.orgId,
+        companyId: target,
+        ...round,
+        status: 'proposed',
+        evidence: 'prix de 120 euros',
+      }),
+    )
+    expect(await user.as.query(api.valuations.list, { dealId })).toHaveLength(0)
+    await user.as.mutation(api.capitalEvents.confirm, { eventId })
+    expect(await user.as.query(api.valuations.list, { dealId })).toHaveLength(1)
+    // Idempotent: a second derivation for the same operation adds nothing.
+    await t.run(async (ctx) => {
+      const rows = await ctx.db
+        .query('valuations')
+        .withIndex('by_capital_event', (q) => q.eq('capitalEventId', eventId))
+        .collect()
+      expect(rows).toHaveLength(1)
+    })
+    await user.as.mutation(api.capitalEvents.remove, { eventId })
+    expect(await user.as.query(api.valuations.list, { dealId })).toHaveLength(0)
+  })
+
+  test('a deal without a share count, exited, or entered after the round gets no valuation', async () => {
+    const base = await setupWithShareDeal('org-capital-valuation-skip')
+    const { t, user, org, target, dealId } = base
+    const mkShareDeal = async (patch: Record<string, unknown>) => {
+      const id = await user.as.mutation(api.deals.create, {
+        orgId: org.orgId,
+        investorCompanyId: org.rootCompanyId,
+        targetCompanyId: target,
+        instrumentKind: 'share',
+        committedAmount: 10_000_00,
+      })
+      await user.as.mutation(api.deals.update, { id, patch })
+      return id
+    }
+    const noShares = await mkShareDeal({ pricePerShare: 80_00 })
+    const exited = await mkShareDeal({
+      sharesAcquired: 100,
+      pricePerShare: 80_00,
+    })
+    await t.run(async (ctx) => {
+      await ctx.db.patch('deals', exited, { status: 'fully_exited' })
+    })
+    const later = await mkShareDeal({
+      sharesAcquired: 50,
+      pricePerShare: 80_00,
+      closingDate: Date.UTC(2026, 2, 1),
+    })
+    await user.as.mutation(api.capitalEvents.create, {
+      companyId: target,
+      ...round,
+    })
+    expect(await user.as.query(api.valuations.list, { dealId })).toHaveLength(1)
+    for (const id of [noShares, exited, later]) {
+      expect(
+        await user.as.query(api.valuations.list, { dealId: id }),
+      ).toHaveLength(0)
+    }
+  })
+})
+
 describe('capital operations on both AI facades', () => {
   async function asksApproval(name: string): Promise<boolean> {
     const tool = (capitalTools as Record<string, { needsApproval?: unknown }>)[

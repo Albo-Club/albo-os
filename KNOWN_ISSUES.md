@@ -2456,6 +2456,25 @@ ou `documentsClassify.ts` pour ses constantes, sous peine de boucler les
 types de `_generated/api` (tout `api` devient `any`) — les constantes
 partagées vivent dans `convex/lib/capitalExtraction.ts`.
 
+**Une opération confirmée écrit des lignes de valorisation (lot 3).** La
+« valo actuelle » d'un deal a un seul point d'entrée en lecture : la dernière
+ligne de `valuations` (`deals.ts:lastValuationCents`, et quatre lecteurs qui
+refont la même requête — garanties, agent, MCP, vue agrégée). Plutôt que de
+brancher les opérations sur le capital dans chacun, `capitalEvents.ts`
+`deriveValuations` écrit, à la confirmation, une ligne par deal `share` de la
+société (`sharesAcquired × pricePerShare`, datée du tour, `source:
+'capital_event'`, `capitalEventId`) — le patron de `statements.ts`. Ce n'est
+pas un solde stocké au sens de la règle « ne rien stocker de dérivable » : une
+valorisation est un **point daté** (un constat à une date), et c'est la table
+qui porte déjà tous les autres points (import, relevé, saisie). Trois pièges :
+la ligne se supprime **avec** l'opération (`remove`, index `by_capital_event`),
+jamais à la main ; un deal entré **après** le tour (`closingDate` / `signedDate`
+> `asOf`) n'en reçoit pas — on ne détenait pas encore les titres ; et une
+opération confirmée **avant** cette version n'a pas de ligne dérivée (la
+supprimer puis la ressaisir en crée une). La dépréciation manuelle est une
+ligne ordinaire saisie depuis la fiche deal (`ValuationSection`), plus récente
+donc gagnante jusqu'au prochain tour.
+
 ## Backfill depuis la doc juridique — 5 pièges
 
 `scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`

@@ -174,10 +174,14 @@ La colonne principale, dans l'ordre de lecture :
   le deal), et une opération déjà connue à quelques jours près, au même prix,
   n'est pas proposée deux fois. L'assistant IA sait lister les opérations
   d'une société, en ajouter une et confirmer une proposition, avec votre
-  accord à chaque écriture. Cette valorisation est **informative**
-  dans un premier temps : elle n'alimente pas encore le TVPI ni la NAV du
-  portefeuille, et la fiche deal comme le pourcentage de l'en-tête restent
-  ce qu'ils sont. Un document cité comme source d'une opération ne peut
+  accord à chaque écriture. **Un tour confirmé valorise nos lignes** :
+  chaque deal en actions de la société reçoit une valorisation datée du tour
+  (titres détenus × nouveau prix), visible dans la section « Valorisation »
+  de sa fiche et lue par le TVPI de la liste ; supprimer l'opération la
+  retire. Un deal sans nombre d'actions, déjà sorti, ou entré après le tour
+  n'est pas touché, et le pourcentage de l'en-tête reste celui du deal. Une
+  dépréciation se saisit sur la fiche du deal (cf. Deals). Un document cité
+  comme source d'une opération ne peut
   plus être supprimé tant que l'opération existe ; une société qui porte
   des opérations non plus. Rien ne s'affiche sur une société détenue via un
   SPV, un BSA-AIR ou une obligation convertible.
