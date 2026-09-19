@@ -134,6 +134,29 @@ export const INSTRUMENT_ARCHETYPE: Record<InstrumentKind, Archetype> = {
   unknown: 'unassigned',
 }
 
+/**
+ * Whether a deal counts as an INVESTMENT in the performance figures
+ * (deployed / distributed / NAV, and the MOIC / TVPI / IRR ratios).
+ *
+ * False for the `management` archetype — `lead_spv` alone today: such a deal
+ * tracks what the org EARNS running an SPV for other investors (fees +
+ * carried), not capital it put at risk. Counting it as an investment made the
+ * ratios meaningless (a few thousand euros of advanced fees against tens of
+ * thousands of revenue gave a MOIC of 2,84x and an IRR of 635 %) and inflated
+ * both totals with money that was never invested nor returned.
+ *
+ * `carry_vehicle` stays a performance deal on purpose: a stake we HOLD in a
+ * carried-interest vehicle is real capital out. Its own ratios will spike the
+ * day the carried is distributed, the stake being nominal — a known, accepted
+ * trade-off, not an oversight.
+ *
+ * An unknown kind counts as an investment: the fallback must never drop money
+ * out of the totals in silence.
+ */
+export function isPerformanceDeal(kind: string): boolean {
+  return INSTRUMENT_ARCHETYPE[kind as InstrumentKind] !== 'management'
+}
+
 /** instrumentKind → render mode. Total Record (every InstrumentKind). */
 export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   share: 'fields',

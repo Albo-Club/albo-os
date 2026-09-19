@@ -15,6 +15,7 @@ import {
   participationSource,
 } from './deals'
 import { requireAppUser } from './lib/auth'
+import { isPerformanceDeal } from './lib/instrumentMapping'
 import { listSilentCompanies, withReportAlerts } from './lib/reportFreshness'
 import type { GenericQueryCtx } from 'convex/server'
 import type { DataModel, Doc } from './_generated/dataModel'
@@ -128,10 +129,15 @@ export const listParticipations = query({
           .collect()
         const companiesById = new Map(companies.map((c) => [c._id, c]))
         const aiScores = await aiScoresByCompany(ctx, m.orgId)
+        // Compensation deals (lead_spv) are SPV-management revenue, not an
+        // investment: they stay out of the rows here exactly as they do in
+        // the per-org `deals.listParticipations`.
         return Promise.all(
-          deals.map((d) =>
-            participationSource(ctx, d, companiesById, aiScores, tag),
-          ),
+          deals
+            .filter((d) => isPerformanceDeal(d.instrumentKind))
+            .map((d) =>
+              participationSource(ctx, d, companiesById, aiScores, tag),
+            ),
         )
       }),
     )

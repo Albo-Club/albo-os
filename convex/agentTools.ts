@@ -32,6 +32,7 @@ import {
 } from './lib/companyEvents'
 import { findSimilarCompanies, findSimilarDeals } from './lib/duplicates'
 import { isAvailableAccount } from './lib/bankAccounts'
+import { isPerformanceDeal } from './lib/instrumentMapping'
 import { normalizeDomain } from './lib/domain'
 import { buildSearchText } from './lib/searchText'
 import {
@@ -919,6 +920,13 @@ export const getDashboardSummaryInternal = internalQuery({
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect()
     const activeDeals = deals.filter((d) => d.status === 'active')
+    // Deployed / distributed / NAV / participations measure INVESTMENTS only:
+    // a compensation deal (lead_spv) is what the org earns running an SPV for
+    // others, so it is neither capital deployed nor a distribution. The two
+    // deal COUNTS below stay factual and keep covering every deal.
+    const activePerfDeals = activeDeals.filter((d) =>
+      isPerformanceDeal(d.instrumentKind),
+    )
 
     // Per-deal indexed reads (cf. convex/dashboard.ts): a full org-wide
     // transactions collect here made every agent answer using this tool
@@ -931,16 +939,17 @@ export const getDashboardSummaryInternal = internalQuery({
     let distributedCents = 0
     deals.forEach((deal, i) => {
       paidByDeal.set(deal._id, totals[i].paidActual)
+      if (!isPerformanceDeal(deal.instrumentKind)) return
       deployedCents += totals[i].paidActual
       distributedCents += totals[i].received
     })
 
     const lastValuations = await Promise.all(
-      activeDeals.map((deal) => lastValuationCents(ctx, deal._id)),
+      activePerfDeals.map((deal) => lastValuationCents(ctx, deal._id)),
     )
     let navCents = 0
     let navIsPartial = false
-    activeDeals.forEach((deal, i) => {
+    activePerfDeals.forEach((deal, i) => {
       const fairValue = lastValuations[i]
       navCents += residualValueCents({
         status: deal.status,
@@ -962,7 +971,7 @@ export const getDashboardSummaryInternal = internalQuery({
     }
 
     const participationsCount = new Set(
-      activeDeals.map((d) => d.targetCompanyId),
+      activePerfDeals.map((d) => d.targetCompanyId),
     ).size
 
     return {

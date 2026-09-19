@@ -15,7 +15,10 @@ import {
   instrumentValidator as sharedInstrumentValidator,
   termDurationValidator,
 } from './lib/instruments'
-import { isTreasuryPlacement } from './lib/instrumentMapping'
+import {
+  isPerformanceDeal,
+  isTreasuryPlacement,
+} from './lib/instrumentMapping'
 import { listSilentCompanies, withReportAlerts } from './lib/reportFreshness'
 import {
   moic as moicRatio,
@@ -245,6 +248,13 @@ export async function dealRealizedMetrics(ctx: Ctx, deal: Doc<'deals'>) {
     })),
     deal.instrumentKind,
   )
+  // A compensation deal (lead_spv) carries no MOIC and no IRR: its "capital"
+  // is advanced fees, not an investment, so the ratio would claim a return
+  // that does not exist. `flows` stays populated — the deal sheet still shows
+  // its movements, and the callers that aggregate flows already skip it.
+  if (!isPerformanceDeal(deal.instrumentKind)) {
+    return { paidActual, received, flows, moic: null, irr: null }
+  }
   const moic = moicRatio({
     capital: paidActual,
     proceeds: proceedsFromReceived(received, deal.instrumentKind),
@@ -544,11 +554,18 @@ export const listParticipations = query({
 
     // Treasury placements (crypto, capitalization accounts, term deposits…)
     // live on the dedicated Placements page — the participations rows only
-    // cover participations. `referencedCompanyIds` below stays computed on
-    // the UNFILTERED set, so a placement's company never shows as orphan.
+    // cover participations. Compensation deals (lead_spv) are left out too:
+    // they are SPV-management revenue, and merging them into their target's
+    // row mixed the fees with the investment, polluting its TVPI.
+    // `referencedCompanyIds` below stays computed on the UNFILTERED set, so
+    // neither a placement's nor a compensation deal's company shows as orphan.
     const sources = await Promise.all(
       deals
-        .filter((d) => !isTreasuryPlacement(d.instrumentKind))
+        .filter(
+          (d) =>
+            !isTreasuryPlacement(d.instrumentKind) &&
+            isPerformanceDeal(d.instrumentKind),
+        )
         .map((d) => participationSource(ctx, d, companiesById, aiScores, null)),
     )
 

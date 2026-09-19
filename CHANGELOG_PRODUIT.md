@@ -23,6 +23,57 @@ bas de page.
 
 ---
 
+## v1.250.0 — 19/09/2026 à 13:06 — Piloter un SPV rapporte, ce n'est pas investir
+
+Quand une société du groupe pilote un SPV pour d'autres investisseurs, elle
+encaisse des frais de gestion et du carried. Ces revenus étaient jusqu'ici
+comptés comme n'importe quel investissement : quelques milliers d'euros de
+frais avancés face à des dizaines de milliers encaissés, et la ligne
+affichait un multiple de 2,84x ou un rendement de 635 %. Un chiffre juste
+au sens du calcul, faux au sens de ce qu'il raconte — piloter n'est pas
+placer.
+
+Ces deals sortent donc des indicateurs de performance : ils ne comptent plus
+dans le capital déployé, le distribué, la valeur estimée du portefeuille ni
+le nombre de participations, et n'affichent plus ni multiple ni rendement.
+Sur Albo Club, le déployé perd 17 760 € et le distribué 35 332,50 € qui
+n'avaient jamais été ni investis ni retournés.
+
+Effet de bord corrigé au passage : les lignes de participation se regroupent
+par société, donc les honoraires de gestion se mélangeaient à
+l'investissement fait dans la même société. La ligne Hectarea annonçait
+160 593 € investis pour 15 250 € revenus ; elle affiche désormais les
+149 913 € réellement investis, sans retour à ce stade. Ces deals restent
+consultables depuis la fiche de la société concernée et dans l'export.
+
+Une participation détenue dans une **structure de carried**, elle, reste un
+investissement à part entière : la mise est réelle, elle garde toutes ses
+métriques.
+
+> **🔧 Notes techniques**
+>
+> - Nouveau filtre unique `isPerformanceDeal(kind)` dans
+>   `convex/lib/instrumentMapping.ts`, à côté de `isTreasuryPlacement` :
+>   faux pour l'archétype `management` (aujourd'hui `lead_spv` seul).
+>   Un `instrumentKind` inconnu reste une performance — le fallback ne doit
+>   jamais faire disparaître d'argent des totaux en silence.
+> - Quatre surfaces branchées dessus : `deals.dealRealizedMetrics`
+>   (`moic`/`irr` à `null`, `flows` conservés pour la fiche),
+>   `deals.listParticipations` et `aggregate.listParticipations` (filtre en
+>   amont de `buildParticipationRows`, qui n'est pas modifié), et
+>   `agentTools.getDashboardSummaryInternal` (déployé / distribué / NAV /
+>   `participationsCount` ; les deux compteurs de deals restent factuels).
+> - `carry_vehicle` reste volontairement une performance : archétype
+>   `equity`, mise réelle. Ses ratios s'envoleront le jour où le carried
+>   tombe, la mise étant nominale — arbitrage assumé, pas un oubli.
+> - `convex/dashboard.ts` n'a **pas** été touché : la page ayant été
+>   retirée, `getDashboard` n'est plus appelé par personne. Code mort
+>   préexistant, signalé et laissé en l'état.
+> - Garde-fous : `tests/performanceDeals.test.ts` fige la liste des
+>   exclusions de façon exhaustive (un `instrumentKind` qui rejoint ou
+>   quitte l'archétype `management` fait rougir la CI), et
+>   `convex/regression.performanceDeals.test.ts` rejoue le cas Hectarea de
+>   bout en bout sur les quatre surfaces.
 ## v1.249.0 — 19/09/2026 à 12:35 — Les documents juridiques proposent les opérations sur le capital
 
 Quand un pacte, un bulletin de souscription ou un PV est déposé sur une

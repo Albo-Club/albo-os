@@ -13,6 +13,13 @@ Les **placements de trésorerie** (crypto, comptes de capitalisation, dépôts
 (un solde et un rendement, pas une participation) et vit sur la page
 [Placements](19-placements.md). Les fonds, eux, restent bien dans la liste.
 
+Les **deals de rémunération de SPV** n'y figurent pas non plus : ce qu'une
+société du groupe gagne à piloter un SPV pour d'autres investisseurs (frais
+de gestion et carried) est un revenu d'activité, pas une participation. Les
+faire apparaître mélangeait les honoraires et l'investissement sur la ligne
+de la même société. Ils restent consultables depuis la fiche de la société
+concernée et dans l'export (cf. [Deals](05-deals.md)).
+
 ## La liste
 
 - **Un tableau par statut**, empilés dans l'ordre de lecture, chacun coiffé
