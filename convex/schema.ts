@@ -31,6 +31,7 @@ import {
   termDurationValidator,
 } from './lib/instruments'
 import { personValidator } from './lib/people'
+import { capitalEventKindValidator } from './lib/capitalPosition'
 import { vatRateBpsValidator } from './lib/vat'
 
 // ─── Better Auth / multi-tenant validators ─────────────────────────────────
@@ -237,6 +238,20 @@ export const companyEvent = v.union(
     kind: v.literal('kpi_removed'),
     metricType: v.string(),
     periodEnd: v.number(),
+  }),
+  // An operation on the company's share capital (convex/capitalEvents.ts):
+  // the values the sheet shows, so the line reads without a lookup.
+  v.object({
+    kind: v.literal('capital_event_added'),
+    capitalKind: capitalEventKindValidator,
+    asOf: v.number(),
+    pricePerShareCents: v.number(),
+    totalSharesAfter: v.number(),
+  }),
+  v.object({
+    kind: v.literal('capital_event_removed'),
+    capitalKind: capitalEventKindValidator,
+    asOf: v.number(),
   }),
   // The AI health score, written at EVERY completed synthesis — including
   // one that leaves the score where it was: the journal is the score's only
@@ -1192,6 +1207,38 @@ export default defineSchema({
     .index('by_deal_asof', ['dealId', 'asOf'])
     .index('by_org_asof', ['orgId', 'asOf'])
     .index('by_airtable_id', ['airtableId']),
+
+  /**
+   * capitalEvents — operations on a portfolio company's share capital, over
+   * time: a funding round, a BSA exercise, a conversion, a secondary, a
+   * reduction. The history behind « Capital et valorisation » on the company
+   * sheet (convex/lib/capitalPosition.ts derives entry vs current from it).
+   *
+   * The ENTRY round is deliberately NOT a row here: it lives on the deal
+   * (price, shares, post-money, closing) — one source of truth, the section
+   * derives it. Nothing derivable is stored either: the implied post-money
+   * is `totalSharesAfter × pricePerShare`, computed at read time.
+   *
+   * `documentId` is the paper the operation was read from (lot 2 fills it
+   * from the legal documents). A document cited here refuses deletion
+   * (documents:remove), and so does the company (companies:remove).
+   */
+  capitalEvents: defineTable({
+    orgId: v.id('organizations'),
+    companyId: v.id('companies'),
+    asOf: v.number(), // ms epoch — date of the operation
+    kind: capitalEventKindValidator,
+    pricePerShare: v.number(), // cents — price paid per share in the operation
+    sharesIssued: v.optional(v.number()), // new shares created (0 for a secondary)
+    totalSharesAfter: v.number(), // shares outstanding after the operation
+    roundSize: v.optional(v.number()), // cents
+    roundType: v.optional(roundType),
+    documentId: v.optional(v.id('documents')),
+    notes: v.optional(v.string()),
+    createdBy: v.optional(v.id('users')),
+  })
+    .index('by_company_asof', ['companyId', 'asOf'])
+    .index('by_document', ['documentId']),
 
   /**
    * kpiSnapshots — portfolio KPI history (ARR, GMV, AUM, headcount…).

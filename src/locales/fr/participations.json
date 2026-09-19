@@ -406,6 +406,8 @@
       "vasco_unlinked": "a délié la fiche de son émetteur Parallel",
       "kpi_added": "a ajouté le KPI {{metric}} au {{date}} · {{value}}",
       "kpi_removed": "a supprimé le KPI {{metric}} au {{date}}",
+      "capital_event_added": "a ajouté une opération sur le capital ({{kind}}) au {{date}} · {{price}} par action, {{total}} actions",
+      "capital_event_removed": "a retiré une opération sur le capital ({{kind}}) au {{date}}",
       "score_updated_first": "a noté la santé à {{to}}/10 (première note)",
       "score_updated_up": "a relevé la note de santé de {{from}} à {{to}}/10",
       "score_updated_down": "a abaissé la note de santé de {{from}} à {{to}}/10",
@@ -598,6 +600,67 @@
       "fairValue": "Fair value",
       "method": "Méthode",
       "source": "Source"
+    }
+  },
+  "capital": {
+    "title": "Capital et valorisation",
+    "entry": "À l'entrée",
+    "current": "Aujourd'hui",
+    "line": "Notre ligne",
+    "postMoney": "Post-money",
+    "pricePerShare": "Prix par action",
+    "ownership": "Détention",
+    "value": "Valeur",
+    "cost": "Coût",
+    "sharesHeld": "Titres détenus",
+    "unchanged": "Aucune opération depuis l'entrée",
+    "downRound": "Down round",
+    "add": "Ajouter une opération",
+    "col": {
+      "date": "Date",
+      "kind": "Opération",
+      "price": "Prix / action",
+      "issued": "Actions émises",
+      "total": "Actions totales",
+      "postMoney": "Post-money",
+      "source": "Source"
+    },
+    "entrySubscribed_one": "{{count}} action souscrite",
+    "entrySubscribed_other": "{{count}} actions souscrites",
+    "kind": {
+      "entry": "Notre entrée",
+      "round": "Tour de financement",
+      "bsa_exercise": "Exercice de BSA",
+      "conversion": "Conversion",
+      "secondary": "Secondaire",
+      "reduction": "Réduction de capital",
+      "other": "Autre opération"
+    },
+    "dialog": {
+      "title": "Ajouter une opération sur le capital",
+      "description": "Une opération postérieure à notre entrée : tour, exercice de BSA, conversion… Le post-money se déduit des actions totales et du prix.",
+      "asOf": "Date de l'opération",
+      "kind": "Type",
+      "pricePerShare": "Prix par action (€)",
+      "sharesIssued": "Actions émises",
+      "totalSharesAfter": "Actions totales après l'opération",
+      "roundSize": "Montant levé (€, optionnel)",
+      "document": "Document source",
+      "documentNone": "Aucun",
+      "notes": "Notes",
+      "impliedPostMoney": "Post-money implicite : {{amount}}",
+      "save": "Enregistrer"
+    },
+    "saved": "Opération enregistrée",
+    "deleted": "Opération retirée",
+    "deleteConfirmTitle": "Retirer cette opération ?",
+    "deleteConfirmDescription": "La frise et la valorisation actuelle seront recalculées sans elle.",
+    "errors": {
+      "invalid_price": "Le prix par action doit être un montant positif.",
+      "invalid_shares": "Le nombre d'actions doit être un entier positif.",
+      "invalid_amount": "Le montant levé doit être positif.",
+      "document_not_found": "Ce document n'appartient pas à cette société.",
+      "default": "Une erreur est survenue"
     }
   },
   "kpis": {
@@ -875,6 +938,7 @@
     },
     "errors": {
       "too_large": "Le fichier dépasse 20 Mo",
+      "document_cited_by_capital_event": "Ce document est la source d'une opération sur le capital. Retirez l'opération d'abord.",
       "default": "Une erreur est survenue"
     }
   },

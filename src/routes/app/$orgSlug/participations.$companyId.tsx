@@ -27,6 +27,7 @@ import { getLocale } from '~/lib/locale'
 import { formatSiren } from '~/lib/siren'
 import { CompanyLogo } from '~/components/CompanyLogo'
 import { CompanyDealsTable } from '~/components/companies/CompanyDealsTable'
+import { CapitalSection } from '~/components/companies/CapitalSection'
 import { SectorCombobox } from '~/components/companies/SectorCombobox'
 import {
   IdentityField,
@@ -658,6 +659,13 @@ function ParticipationDetail() {
               <CompanyDealsTable deals={deals} orgSlug={orgSlug} />
             )}
           </IdentitySection>
+
+          {/* Entry vs current valuation of our share deals, and the capital
+              operations recorded after the entry. Renders nothing without a
+              share deal (ALB-248, lot 1). */}
+          {company && deals && (
+            <CapitalSection company={company} deals={deals} />
+          )}
 
           {/* What WE did on those deals — who changed what, when — before
               what the company sends us. */}

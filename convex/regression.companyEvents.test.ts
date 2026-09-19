@@ -867,6 +867,39 @@ describe('companyEvents: the company itself, KPIs and the business plan', () => 
     ).toEqual([false, true, false])
   })
 
+  test('a capital operation added then removed (ALB-248)', async () => {
+    const { user, target } = await orgSetup('org-capital-journal')
+    const eventId = await user.as.mutation(api.capitalEvents.create, {
+      companyId: target,
+      asOf: Date.UTC(2025, 11, 10),
+      kind: 'round',
+      pricePerShare: 80_00,
+      sharesIssued: 2_500,
+      totalSharesAfter: 40_000,
+    })
+    await user.as.mutation(api.capitalEvents.remove, { eventId })
+    const rows = (
+      await user.as.query(api.companyEvents.listByCompany, {
+        companyId: target,
+      })
+    ).filter((r) => r.deal === null)
+    expect(rows.map((r) => r.event)).toEqual([
+      {
+        kind: 'capital_event_removed',
+        capitalKind: 'round',
+        asOf: Date.UTC(2025, 11, 10),
+      },
+      {
+        kind: 'capital_event_added',
+        capitalKind: 'round',
+        asOf: Date.UTC(2025, 11, 10),
+        pricePerShareCents: 80_00,
+        totalSharesAfter: 40_000,
+      },
+    ])
+    expect(rows.every((r) => r.actor.kind === 'user')).toBe(true)
+  })
+
   test('the AI score is journaled at every synthesis, changed or not (ALB-252)', async () => {
     const { t, user, org, target } = await orgSetup('org-score')
     const synth = (score: number, label: string) =>

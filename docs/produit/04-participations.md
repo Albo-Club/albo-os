@@ -142,6 +142,26 @@ La colonne principale, dans l'ordre de lecture :
   d'emblée **tous les champs de l'instrument** choisi (montant, dates dont
   le closing, tour, valorisations, titres acquis…) pour tout renseigner en
   une fois.
+- **Capital et valorisation** : sur une participation détenue en **actions
+  en direct**, trois tuiles lisent la ligne d'un coup d'œil — **à l'entrée**
+  (post-money, prix par action, détention, tels que portés par le deal),
+  **aujourd'hui** (les mêmes chiffres au dernier prix connu, avec la
+  détention diluée) et **notre ligne** (valeur = titres détenus × dernier
+  prix, face au coût). En dessous, la **frise des opérations sur le
+  capital** : notre entrée d'abord, puis chaque tour, exercice de BSA,
+  conversion, secondaire ou réduction saisi depuis « Ajouter une
+  opération » (date, type, prix par action, actions émises et totales,
+  montant levé, document source, notes). Le post-money d'une opération
+  n'est jamais saisi : il se déduit des actions totales et du prix. Un
+  dernier prix **sous** le prix d'entrée affiche un badge **Down round**.
+  Tant qu'aucune opération n'est saisie, « aujourd'hui » vaut « à
+  l'entrée » et la section le dit. Cette valorisation est **informative**
+  dans un premier temps : elle n'alimente pas encore le TVPI ni la NAV du
+  portefeuille, et la fiche deal comme le pourcentage de l'en-tête restent
+  ce qu'ils sont. Un document cité comme source d'une opération ne peut
+  plus être supprimé tant que l'opération existe ; une société qui porte
+  des opérations non plus. Rien ne s'affiche sur une société détenue via un
+  SPV, un BSA-AIR ou une obligation convertible.
 - **Activité** : le journal de ce que nous avons fait sur cette société —
   qui, quoi, quand. Une ligne par geste, les plus récentes en haut, groupées
   par jour, cinq visibles puis « Afficher les précédentes ». Sur les

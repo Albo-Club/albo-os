@@ -406,6 +406,8 @@
       "vasco_unlinked": "unlinked the company from its Parallel issuer",
       "kpi_added": "added the {{metric}} KPI as of {{date}} · {{value}}",
       "kpi_removed": "removed the {{metric}} KPI as of {{date}}",
+      "capital_event_added": "added a capital operation ({{kind}}) as of {{date}} · {{price}} per share, {{total}} shares",
+      "capital_event_removed": "removed a capital operation ({{kind}}) as of {{date}}",
       "score_updated_first": "scored the company's health {{to}}/10 (first score)",
       "score_updated_up": "raised the health score from {{from}} to {{to}}/10",
       "score_updated_down": "lowered the health score from {{from}} to {{to}}/10",
@@ -598,6 +600,67 @@
       "fairValue": "Fair value",
       "method": "Method",
       "source": "Source"
+    }
+  },
+  "capital": {
+    "title": "Capital & valuation",
+    "entry": "At entry",
+    "current": "Today",
+    "line": "Our line",
+    "postMoney": "Post-money",
+    "pricePerShare": "Price per share",
+    "ownership": "Ownership",
+    "value": "Value",
+    "cost": "Cost",
+    "sharesHeld": "Shares held",
+    "unchanged": "No operation since entry",
+    "downRound": "Down round",
+    "add": "Add an operation",
+    "col": {
+      "date": "Date",
+      "kind": "Operation",
+      "price": "Price / share",
+      "issued": "Shares issued",
+      "total": "Total shares",
+      "postMoney": "Post-money",
+      "source": "Source"
+    },
+    "entrySubscribed_one": "{{count}} share subscribed",
+    "entrySubscribed_other": "{{count}} shares subscribed",
+    "kind": {
+      "entry": "Our entry",
+      "round": "Funding round",
+      "bsa_exercise": "BSA exercise",
+      "conversion": "Conversion",
+      "secondary": "Secondary",
+      "reduction": "Capital reduction",
+      "other": "Other operation"
+    },
+    "dialog": {
+      "title": "Add a capital operation",
+      "description": "An operation after our entry: a round, a BSA exercise, a conversion… The post-money follows from the total shares and the price.",
+      "asOf": "Operation date",
+      "kind": "Type",
+      "pricePerShare": "Price per share (€)",
+      "sharesIssued": "Shares issued",
+      "totalSharesAfter": "Total shares after the operation",
+      "roundSize": "Amount raised (€, optional)",
+      "document": "Source document",
+      "documentNone": "None",
+      "notes": "Notes",
+      "impliedPostMoney": "Implied post-money: {{amount}}",
+      "save": "Save"
+    },
+    "saved": "Operation saved",
+    "deleted": "Operation removed",
+    "deleteConfirmTitle": "Remove this operation?",
+    "deleteConfirmDescription": "The timeline and the current valuation will be recomputed without it.",
+    "errors": {
+      "invalid_price": "The price per share must be a positive amount.",
+      "invalid_shares": "The share count must be a positive integer.",
+      "invalid_amount": "The amount raised must be positive.",
+      "document_not_found": "This document does not belong to this company.",
+      "default": "Something went wrong"
     }
   },
   "kpis": {
@@ -875,6 +938,7 @@
     },
     "errors": {
       "too_large": "File is larger than 20 MB",
+      "document_cited_by_capital_event": "This document backs a capital operation. Remove the operation first.",
       "default": "Something went wrong"
     }
   },
