@@ -39,7 +39,10 @@ import {
 import { ExitDealDialog } from '~/components/deals/ExitDealDialog'
 import { DealForecastSection } from '~/components/deals/DealForecastSection'
 import { FundSection } from '~/components/deals/FundSection'
-import { ValuationSection } from '~/components/deals/ValuationSection'
+import {
+  ValuationSection,
+  showsValuationSection,
+} from '~/components/deals/ValuationSection'
 import {
   FIELD_FORMAT,
   InstrumentDetails,
@@ -845,10 +848,13 @@ function DealDetail() {
               realized layer is the Transactions section above. */}
           <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
-          {/* Valuation history of a share deal (feeds its TVPI): rounds
-              confirmed on the company sheet + manual adjustments. */}
-          {deal.instrumentKind === 'share' && (
-            <ValuationSection dealId={deal._id} />
+          {/* Valuation history of the deal (feeds its TVPI): rounds confirmed
+              on the company sheet (shares) + manual adjustments. */}
+          {showsValuationSection(deal.instrumentKind) && (
+            <ValuationSection
+              dealId={deal._id}
+              instrumentKind={deal.instrumentKind}
+            />
           )}
 
           {deal.instrumentKind === 'fund_lp' && (
