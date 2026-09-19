@@ -45,14 +45,15 @@ type ManualMethod = (typeof MANUAL_METHODS)[number]
 
 /**
  * Instrument kinds whose deal sheet carries the « Valorisation » section.
- * Shares are valued by the capital operations of the company sheet; the
- * three convertible kinds are valued by hand only (a capital operation
- * moves the shares we HOLD, which these instruments are not yet). Other
- * kinds either have their own panel (fund_lp, royalty, lead_spv) or no
- * notion of a fair value to correct.
+ * Shares are valued by the capital operations of the company sheet; the four
+ * convertible kinds are valued by hand only (a capital operation moves the
+ * shares we HOLD, which these instruments are not yet). Other kinds either
+ * have their own panel (fund_lp, royalty, lead_spv) or no notion of a fair
+ * value to correct.
  */
 const VALUATION_SECTION_KINDS = new Set<InstrumentKind>([
   'share',
+  'safe',
   'bsa_air',
   'oc',
   'convertible_note',

@@ -76,7 +76,8 @@ visible pendant qu'on fait défiler la page.
   l'affichage. Les paramètres (capital investi, taux, multiples, dates) sont
   dans le panneau de droite, comme pour tout autre instrument.
 - **Section Fonds** (engagements LP) : appels et distributions.
-- **Valorisation** (deals en actions, BSA AIR, obligations convertibles) :
+- **Valorisation** (deals en actions, SAFE, BSA AIR, obligations
+  convertibles) :
   l'historique des valorisations de la ligne — date, valeur, méthode, source —
   dont la plus récente est celle que lit le TVPI. Les lignes arrivent de trois
   côtés : un **tour confirmé** dans « Capital et valorisation » de la fiche
@@ -85,7 +86,7 @@ visible pendant qu'on fait défiler la page.
   une date : une **dépréciation** ou une valorisation manuelle, qui prend le
   dessus jusqu'au prochain tour confirmé. Retirer l'opération sur la fiche
   société retire la valorisation qu'elle avait produite. Les tours confirmés
-  ne valorisent que les **actions détenues** : sur un BSA AIR ou une
+  ne valorisent que les **actions détenues** : sur un SAFE, un BSA AIR ou une
   obligation convertible, encore non converti en titres, la section n'attend
   que les ajustements manuels.
 - **Business plan vs réalisé** : graphique et tableau comparant le BP initial
