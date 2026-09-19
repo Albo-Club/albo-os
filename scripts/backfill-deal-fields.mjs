@@ -387,6 +387,7 @@ async function dryRun() {
           documentId: doc.documentId,
           documentTitle: doc.title,
           documentKind: doc.kind,
+          documentPeriod: doc.period,
         })
         continue
       }
@@ -436,6 +437,7 @@ async function dryRun() {
         documentId: doc.documentId,
         documentTitle: doc.title,
         documentKind: doc.kind,
+        documentPeriod: doc.period,
       })
     }
 

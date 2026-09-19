@@ -2418,11 +2418,11 @@ Trois choses non évidentes qui coûteraient cher à redécouvrir :
 Le critère d'efficacité de la suite a été vérifié : commenter le
 `requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
 
-## Backfill depuis la doc juridique — 4 pièges
+## Backfill depuis la doc juridique — 5 pièges
 
 `scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`
 remplissent les champs vides des `companies`/`deals` de l'org `albo` à partir
-des documents juridiques déjà versés. Trois choses non évidentes.
+des documents juridiques déjà versés. Cinq choses non évidentes.
 
 1. **Un même document contient plusieurs nombres d'actions, tous corrects.**
    Sur Auxicare, le PV du Président porte **480 000** (capital après la seule
@@ -2475,6 +2475,22 @@ des documents juridiques déjà versés. Trois choses non évidentes.
    `vectorize:backfillAll`. Corollaire non négociable : le cache est écrit
    **après chaque document**, jamais en fin de run — sinon un arrêt jette tout
    ce qui a déjà été payé.
+
+5. **Le rang d'une source ne dit pas de quel tour elle parle.** Sur ACT
+   Running, le « Rapport du Président » du 10/12/2025 (kind `legal`, rang 1)
+   décrit le tour **suivant** : même prix de 80 €, capital porté de 37 500 à
+   40 000 actions. L'arbitrage par rang seul le faisait gagner sur le bulletin
+   de septembre (rang 2) et proposait pre-money 3 000 000 € / post-money
+   3 200 000 € (dérivé : 40 000 × 80 €) contre les 2 856 080 € / 3 000 000 €
+   d'entrée — en ÉCART ici parce que les champs étaient remplis, en
+   PROPOSITION sur un deal vide. Tous ces chiffres sont exacts, aucun ne
+   concerne notre tour. Depuis, `planDeal` compare la date du document
+   (`documents.period`, passée en ISO dans `documentPeriod`) à la date du deal
+   (closing, sinon signature) : au-delà de `LATER_DOCUMENT_TOLERANCE_DAYS`
+   (60 jours, le temps qu'un PV constate l'augmentation), le document sort des
+   sources et le rapport le dit (`document_posterieur_au_deal`). Un document
+   sans date, ou un deal sans date, ne filtre rien — le comportement d'avant.
+   Cas figé dans `convex/regression.docBackfill.test.ts` (« ACT Running »).
 
 ## Convex dev typecheck
 

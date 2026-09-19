@@ -23,6 +23,36 @@ bas de page.
 
 ---
 
+## v1.247.1 — 18/09/2026 à 23:25 — Le backfill documentaire ne confond plus le tour suivant avec le tour d'entrée
+
+Quand une société a levé de nouveau après notre entrée, ses documents
+juridiques les plus récents (PV, rapport du Président) décrivent ce nouveau
+tour : nouveau capital, nouvelle valorisation. Le rapport de reprise depuis
+la doc juridique les prenait pour la source la plus fiable et proposait
+alors, sur notre deal, la valorisation du tour **suivant** à la place de
+celle à laquelle nous étions entrés — sur ACT Running, 3,2 M€ post-money au
+lieu de 3 M€. Un document daté après le closing du deal n'est plus une source
+pour ce deal ; le rapport le signale ligne par ligne. La valorisation
+d'entrée d'un deal reste ce qu'elle est : un fait figé.
+
+> **🔧 Notes techniques**
+>
+> - `convex/lib/docBackfill.ts` : `DocExtraction.documentPeriod` (ISO, depuis
+>   `documents.period`) ; `planDeal` compare à `current.deal.closingDate`
+>   (sinon `signedDate`) et écarte au-delà de `LATER_DOCUMENT_TOLERANCE_DAYS`
+>   (60 j) avec une ligne NON TRAITÉ `document_posterieur_au_deal`. Sans date
+>   d'un côté ou de l'autre, rien ne filtre.
+> - `convex/migrations/alboDocBackfill.ts` : `listTargets` renvoie `period`
+>   des documents en ISO ; `extractionValidator` accepte `documentPeriod`.
+>   `scripts/backfill-deal-fields.mjs` le passe depuis les métadonnées, pas
+>   depuis le cache d'extraction.
+> - Cas figé « ACT Running » dans `convex/regression.docBackfill.test.ts` ;
+>   piège n° 5 dans `KNOWN_ISSUES.md` § « Backfill depuis la doc juridique ».
+> - Doc produit 06 : la saisie manuelle d'une valorisation vit sur les fiches
+>   fonds et placements, pas sur toute fiche deal (phrase corrigée).
+
+---
+
 ## v1.247.0 — 18/09/2026 à 22:40 — Banques cloisonnées par défaut, liens entre organisations déclarés
 
 Jusqu'ici, l'app décidait toute seule qu'un compte Palatine était forcément

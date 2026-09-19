@@ -279,6 +279,8 @@ export const listTargets = internalQuery({
           documentId: doc._id,
           title: doc.title,
           kind: doc.kind,
+          // ISO, like the deal dates above: `planDeal` compares the two.
+          period: doc.period === undefined ? null : msToIso(doc.period),
           dealId: doc.dealId ?? null,
           ocrState: doc.ocrState ?? null,
           ocrDetail: doc.ocrDetail ?? null,
@@ -465,6 +467,7 @@ const extractionValidator = v.object({
   documentId: v.string(),
   documentTitle: v.string(),
   documentKind: v.string(),
+  documentPeriod: v.optional(v.union(v.null(), v.string())),
   company: v.object({
     legalName: citedString,
     legalForm: citedString,
