@@ -245,7 +245,7 @@ export const getByCompanyInternal = internalQuery({
 
 // ─── Runner ──────────────────────────────────────────────────────────────────
 
-function extractJson(text: string): unknown {
+export function extractJson(text: string): unknown {
   const block = text.match(/```json\s*([\s\S]*?)```/)
   const candidate = block ? block[1] : text
   const cleaned = candidate.replace(/```json\s*/gi, '').replace(/```/g, '').trim()
