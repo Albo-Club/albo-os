@@ -928,9 +928,9 @@ export const getDashboardSummaryInternal = internalQuery({
       isPerformanceDeal(d.instrumentKind),
     )
 
-    // Per-deal indexed reads (cf. convex/dashboard.ts): a full org-wide
-    // transactions collect here made every agent answer using this tool
-    // pay a multi-second query.
+    // Per-deal indexed reads: a full org-wide transactions collect here made
+    // every agent answer using this tool pay a multi-second query (see
+    // KNOWN_ISSUES "Agrégats de portefeuille : lire par deal").
     const totals = await Promise.all(
       deals.map((deal) => transactionTotals(ctx, deal._id)),
     )
@@ -965,7 +965,7 @@ export const getDashboardSummaryInternal = internalQuery({
       .collect()
     let cashCents = 0
     for (const account of accounts) {
-      // Available cash only — same scope as dashboard.ts (closed/pledged out).
+      // Available cash only (closed/pledged accounts out — lib/bankAccounts).
       if (!isAvailableAccount(account) || account.currency !== 'EUR') continue
       cashCents += account.currentBalance ?? 0
     }

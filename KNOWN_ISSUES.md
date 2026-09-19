@@ -7148,3 +7148,26 @@ Deux conséquences à garder en tête :
   c'est l'ordre de l'index. Il borne ce qui est **lu**, pas ce qui est
   **montré** ; au-delà de 200 reports sur une société les deux ordres
   pourraient diverger à la marge. Aucune société n'en est proche.
+
+## Agrégats de portefeuille : lire par deal, jamais toute la table
+
+Le premier tableau de bord (`convex/dashboard.ts`, supprimé en 09/2026 avec la
+page) sommait le déployé, le distribué et la NAV en collectant **toute** la
+table `transactions` de l'org. Elle grossit sans borne au fil des imports
+bancaires : la page mettait des secondes à s'afficher. Le correctif a été de
+lire **par deal**, via l'index `by_deal` (transactions) et `by_deal_asof`
+(valorisations), une seule fois, et de réutiliser ces lectures pour les totaux
+ponctuels **et** pour la série mensuelle — ce qui garantit au passage que le
+dernier point de la courbe réconcilie avec le total affiché.
+
+Le fichier est parti, la règle reste : toute nouvelle agrégation de
+portefeuille (KPI, export, outil agent, futur tableau de bord) lit par deal.
+`convex/agentTools.ts:getDashboardSummaryInternal` est l'exemple vivant du
+patron — il porte le même commentaire, pour la même raison.
+
+Le code supprimé reste récupérable dans l'historique git (`git log --diff-filter=D
+-- convex/dashboard.ts`) : il contenait aussi une répartition du déployé par
+instrument, une série de NAV mensuelle sur 24 mois et les dernières
+transactions enrichies. À relire comme une source d'inspiration, jamais à
+restaurer tel quel — il a été écrit avant `isPerformanceDeal` et compte donc
+les deals de rémunération dans ses totaux.
