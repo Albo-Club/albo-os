@@ -23,9 +23,9 @@ bas de page.
 
 ---
 
-## v1.252.0 — 19/09/2026 à 17:44 — Chaque instrument qui vaut quelque chose peut être valorisé
+## v1.254.0 — 19/09/2026 à 17:47 — Chaque instrument qui vaut quelque chose peut être valorisé
 
-La section « Valorisation » n'était ouverte qu'aux deals en actions. Elle l'est maintenant à tout ce qui porte une valeur de ligne : parts de SPV, BSA, SAFE et BSA AIR, obligations convertibles, parts de véhicule de carried, SCPI, et la dette investie — obligations simples, prêts et comptes courants d'associé, où le geste utile est la **dépréciation** d'un débiteur en difficulté. Le panneau « Fonds » reçoit le même bouton **« Ajuster »**, à côté de son historique, pour saisir la NAV d'un reporting trimestriel sans passer par l'assistant.
+La section « Valorisation » n'était ouverte qu'aux deals en actions. La version précédente y a ajouté les SAFE, BSA AIR et obligations convertibles. Elle est maintenant ouverte à tout ce qui porte une valeur de ligne : parts de SPV, BSA, parts de véhicule de carried, SCPI, et la dette investie — obligations simples, prêts et comptes courants d'associé, où le geste utile est la **dépréciation** d'un débiteur en difficulté. Le panneau « Fonds » reçoit le même bouton **« Ajuster »**, à côté de son historique, pour saisir la NAV d'un reporting trimestriel sans passer par l'assistant.
 
 Ce qui n'est pas concerné l'est par choix : un placement de trésorerie garde son solde, saisi sur la page Placements ou lu dans un relevé importé ; un bien se valorise dans l'immobilier ; des royalties valent les flux qu'il leur reste à verser, déjà projetés par leur panneau ; un SPV mené est un revenu de gestion, pas une position.
 
@@ -34,11 +34,42 @@ Comme avant, la valorisation la plus récente d'une ligne est celle que lisent l
 > **🔧 Notes techniques**
 >
 > - Décision matérialisée en **un seul endroit** : `VALUATION_TRACKED_KINDS` + `tracksValuation(kind)` dans `convex/lib/instrumentMapping.ts`, à côté de `isPerformanceDeal` et de `TREASURY_PLACEMENT_KINDS`. Le commentaire du bloc porte l'arbitrage instrument par instrument, y compris les exclusions et leur raison.
-> - `src/routes/app/$orgSlug/deals.$dealId.tsx` monte `ValuationSection` sur `tracksValuation(deal.instrumentKind)` (au lieu de `=== 'share'`), `fund_lp` excepté : son historique vit déjà dans `FundSection`.
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` monte `ValuationSection` sur `tracksValuation(deal.instrumentKind)`, `fund_lp` excepté : son historique vit déjà dans `FundSection`. Le `showsValuationSection` posé par la v1.253.0 dans `ValuationSection.tsx` disparaît au profit du prédicat partagé ; `CAPITAL_DERIVED_KINDS` reste sur place, il répond à une autre question (quel état vide afficher).
 > - Le dialogue « Ajuster » sort de `ValuationSection.tsx` vers `src/components/deals/AdjustValuationDialog.tsx` (aucun changement de comportement), avec le helper de libellé `useValuationLabel()`. `FundSection` l'utilise pour son bouton et pour afficher méthode/source en clair, au lieu des valeurs brutes.
 > - Rien de nouveau côté backend : `valuations.create` et son journal `valuation_added` étaient déjà génériques.
 > - Garde-fou : `tests/valuationTracked.test.ts` assère la liste **exhaustivement** (modèle `tests/performanceDeals.test.ts`) — ouvrir un instrument devient une édition délibérée.
 > - Hors périmètre, à cadrer séparément : propager un tour de la société cible aux parts de SPV, et importer les NAV depuis les rapports trimestriels sur le modèle de `convex/capitalEventsExtract.ts`.
+
+## v1.253.0 — 19/09/2026 à 17:22 — « Capital et valorisation » va droit au but
+
+La section de la fiche société est refaite pour se lire d'un coup d'œil. Les trois tuiles qui répétaient les mêmes libellés laissent la place à **un seul chiffre en tête** : ce que vaut notre ligne aujourd'hui, avec l'**écart au coût** à côté, en vert ou en rouge. Le badge **Down round** s'affiche là, à côté du chiffre, plutôt que perdu dans une tuile.
+
+Sous un filet, un **comparatif à trois lignes** met l'entrée face à aujourd'hui, chaque libellé écrit une seule fois : prix par action, notre détention, valorisation de la société. Quand rien ne s'est passé depuis l'entrée, il se replie sur une seule colonne au lieu d'afficher deux fois les mêmes valeurs.
+
+La **liste des opérations** passe de six colonnes à quatre : date, type, prix par action, valorisation de la société. Le reste, titres émis, titres au total et document source, se déplie au **chevron** en bout de ligne, et c'est là que se trouve désormais **Retirer**.
+
+Enfin, les **propositions lues dans vos documents** remontent dans leur propre bloc au-dessus de la liste, avec **Confirmer** et **Refuser** bien en vue. Elles étaient grisées en bas de la chronologie, là où on ne les voyait pas.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/companies/CapitalSection.tsx` : rendu refait. Les helpers `SnapshotTile` et `Row` disparaissent au profit d'un bloc héros (`valueCents`, delta vs `costCents`, badge `downRound`) et d'un `ColumnHead` pour les deux colonnes du comparatif, construit depuis un tableau `compareRows` (prix / détention / post-money). La grille passe à `grid-cols-[minmax(0,1fr)_8rem_8rem]`, repliée à deux colonnes quand `position.unchanged`.
+> - Liste des opérations : 4 colonnes + colonne chevron, détail replié dans une `TableRow` `colSpan={5}` pilotée par un `expandedId` unique (`point.id`) ; `detailLine()` assemble titres émis / total / document. Le bouton `Trash2` par ligne devient un lien « Retirer » dans ce détail.
+> - Propositions sorties du `<Table>` vers un bloc de cartes au-dessus, même `confirm` / `reject`.
+> - Aucun changement de données ni de calcul : `computeCapitalPosition` et `convex/capitalEvents.ts` sont inchangés, la refonte est purement présentation.
+> - Libellés `participations:capital.*` (en/fr) : ajout de `lineToday`, `companyValuation`, `operations`, `pendingTitle`, `removeAction`, `expand` / `collapse`, `costAndShares`, `proposalMeta`, `detail*` ; retrait de `value`, `cost`, `sharesHeld`, `postMoney`, `line`, `proposed`, `entrySubscribed` devenus orphelins.
+> - Docs : `docs/produit/04-participations.md` et lignes TP13 / TP14 de `TESTING.md`.
+
+## v1.252.0 — 19/09/2026 à 16:52 — Déprécier un SAFE, un BSA AIR ou une obligation convertible
+
+La section « Valorisation » de la fiche deal, jusqu'ici réservée aux lignes en actions, s'ouvre aux **SAFE**, aux **BSA AIR**, aux **obligations convertibles** et aux **convertible notes**. On y lit l'historique des valorisations et on **ajuste** la valeur à la main — une dépréciation ou une valorisation manuelle, datée — exactement comme sur une ligne en actions. C'est la valeur que reprennent ensuite le TVPI de la liste des participations, la marge des nantissements et l'assistant IA.
+
+Différence à garder en tête : un tour confirmé dans « Capital et valorisation » ne valorise que les **actions détenues**. Sur un titre non encore converti, la section n'attend donc que les ajustements manuels, et le dit quand elle est vide.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/deals/ValuationSection.tsx` : le composant prend `instrumentKind` et exporte `showsValuationSection()` (`share`, `safe`, `bsa_air`, `oc`, `convertible_note`), lu par `deals.$dealId.tsx` à la place du test `=== 'share'`. `CAPITAL_DERIVED_KINDS` (shares seules) choisit la copie de l'état vide.
+> - Aucun changement backend : `valuations.create` / `list` ne filtrent pas par instrument, et `capitalEvents.deriveValuations` continue de ne dériver que sur les deals `share`.
+> - Libellé `participations:valuation.emptyManual` (en/fr). Vérifié qu'aucun autre panneau de la fiche ne montre déjà une valorisation pour ces trois types (`CUSTOM_PANELS` ne couvre que `lead_spv` et `royalty`, `fund_lp` garde sa `FundSection`).
 
 ## v1.251.0 — 19/09/2026 à 15:50 — Un tour confirmé valorise la ligne
 

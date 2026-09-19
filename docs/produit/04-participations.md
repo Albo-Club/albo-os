@@ -150,24 +150,30 @@ La colonne principale, dans l'ordre de lecture :
   le closing, tour, valorisations, titres acquis…) pour tout renseigner en
   une fois.
 - **Capital et valorisation** : sur une participation détenue en **actions
-  en direct**, trois tuiles lisent la ligne d'un coup d'œil — **à l'entrée**
-  (post-money, prix par action, détention, tels que portés par le deal),
-  **aujourd'hui** (les mêmes chiffres au dernier prix connu, avec la
-  détention diluée) et **notre ligne** (valeur = titres détenus × dernier
-  prix, face au coût). En dessous, la **frise des opérations sur le
-  capital** : notre entrée d'abord, puis chaque tour, exercice de BSA,
-  conversion, secondaire ou réduction saisi depuis « Ajouter une
-  opération » (date, type, prix par action, actions émises et totales,
-  montant levé, document source, notes). Le post-money d'une opération
-  n'est jamais saisi : il se déduit des actions totales et du prix. Un
-  dernier prix **sous** le prix d'entrée affiche un badge **Down round**.
-  Tant qu'aucune opération n'est saisie, « aujourd'hui » vaut « à
-  l'entrée » et la section le dit. **Les documents nourrissent la frise** :
-  quand un pacte, un bulletin ou un PV est déposé sur la société (ou qu'un
-  document existant est reclassé dans l'un de ces types), l'app le lit et
-  **propose** les opérations qu'il décrit, chacune avec l'extrait du texte
-  qui la justifie. Une proposition apparaît en fin de frise, marquée
-  « Proposée », avec **Confirmer** et **Refuser** : confirmée, elle compte
+  en direct**, la section s'ouvre sur **un seul chiffre**, la valeur de
+  notre ligne aujourd'hui (titres détenus × dernier prix connu), avec
+  l'**écart au coût** à côté, en vert ou en rouge, puis le coût et le nombre
+  de titres en dessous. Un dernier prix **sous** le prix d'entrée ajoute un
+  badge **Down round** à côté de ce chiffre. Sous un filet, un **comparatif
+  à trois lignes** met l'entrée face à aujourd'hui, chaque libellé écrit une
+  seule fois : prix par action, notre détention, valorisation de la société.
+  Tant qu'aucune opération n'est saisie, le comparatif se replie sur une
+  seule colonne et la section dit qu'il ne s'est rien passé depuis l'entrée.
+  En dessous, la **liste des opérations sur le capital** : notre entrée
+  d'abord, puis chaque tour, exercice de BSA, conversion, secondaire ou
+  réduction saisi depuis « Ajouter une opération » (date, type, prix par
+  action, actions émises et totales, montant levé, document source, notes).
+  La liste n'affiche que la date, le type, le prix par action et la
+  valorisation de la société ; le **chevron en bout de ligne** déplie le
+  reste — titres émis, titres au total, document source — et c'est là que
+  se trouve **Retirer**. Le post-money d'une opération n'est jamais saisi :
+  il se déduit des actions totales et du prix. **Les documents nourrissent
+  la liste** : quand un pacte, un bulletin ou un PV est déposé sur la
+  société (ou qu'un document existant est reclassé dans l'un de ces types),
+  l'app le lit et **propose** les opérations qu'il décrit, chacune avec
+  l'extrait du texte qui la justifie. Les propositions se rangent dans un
+  bloc **au-dessus** de la liste, « Lue dans un document · à confirmer »,
+  avec **Confirmer** et **Refuser** : confirmée, une proposition compte
   comme une opération saisie à la main et s'inscrit dans l'Activité au nom
   de qui l'a confirmée ; refusée, elle disparaît et ne sera pas re-proposée
   au prochain dépôt. Notre propre tour d'entrée n'est jamais proposé (c'est

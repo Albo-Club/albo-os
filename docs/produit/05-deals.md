@@ -86,7 +86,10 @@ visible pendant qu'on fait défiler la page.
   qui fixe la valeur à la main à une date : une **dépréciation** ou une
   valorisation manuelle, qui prend le dessus jusqu'au prochain tour confirmé.
   Retirer l'opération sur la fiche société retire la valorisation qu'elle
-  avait produite.
+  avait produite. Les tours confirmés ne valorisent que les **actions
+  détenues** : partout ailleurs — un SAFE, un BSA AIR ou une obligation
+  convertible pas encore convertis en titres, une obligation simple, une
+  SCPI — la section n'attend que les ajustements manuels.
 
   Tous les instruments ne portent pas cette section : elle est là pour les
   **actions**, les **parts de SPV**, les **BSA**, les **SAFE / BSA AIR**, les

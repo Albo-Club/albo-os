@@ -849,12 +849,15 @@ function DealDetail() {
           <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
           {/* Valuation history of the instruments that track one (closed
-              list: tracksValuation): rounds confirmed on the company sheet,
-              imports and manual adjustments. fund_lp tracks a valuation too,
-              but its history lives in the fund panel below. */}
+              list: tracksValuation): rounds confirmed on the company sheet
+              (shares only), imports and manual adjustments. fund_lp tracks a
+              valuation too, but its history lives in the fund panel below. */}
           {tracksValuation(deal.instrumentKind) &&
             deal.instrumentKind !== 'fund_lp' && (
-              <ValuationSection dealId={deal._id} />
+              <ValuationSection
+                dealId={deal._id}
+                instrumentKind={deal.instrumentKind}
+              />
             )}
 
           {deal.instrumentKind === 'fund_lp' && (

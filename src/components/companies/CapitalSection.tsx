@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Fragment, useMemo, useState } from 'react'
+import { ChevronDown, Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexMutation, useConvexQuery } from '@convex-dev/react-query'
 import { ConvexError } from 'convex/values'
@@ -14,7 +14,6 @@ import type { FunctionReturnType } from 'convex/server'
 import type { Id } from '../../../convex/_generated/dataModel'
 import type {
   CapitalEventKind,
-  CapitalSnapshot,
   TimelinePoint,
 } from '../../../convex/lib/capitalPosition'
 import { IdentitySection } from '~/components/companies/EntityFiche'
@@ -39,6 +38,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select'
+import { Separator } from '~/components/ui/separator'
 import { LoadingLine } from '~/components/ui/spinner'
 import {
   Table,
@@ -49,6 +49,7 @@ import {
   TableRow,
 } from '~/components/ui/table'
 import { eurosToCents } from '~/lib/parse'
+import { cn } from '~/lib/utils'
 
 type Deals = FunctionReturnType<typeof api.deals.list>
 
@@ -79,6 +80,8 @@ export function CapitalSection({
   const rejectEvent = useConvexMutation(api.capitalEvents.reject)
   const [adding, setAdding] = useState(false)
   const [deleteId, setDeleteId] = useState<Id<'capitalEvents'> | null>(null)
+  // One open detail row at a time: the timeline point's id, or null.
+  const [expandedId, setExpandedId] = useState<string | null>(null)
 
   const shareDeals = useMemo(
     () =>
@@ -127,10 +130,38 @@ export function CapitalSection({
           maximumFractionDigits: 2,
         }).format(bps / 10_000)
 
-  const documentTitle = (point: TimelinePoint) =>
-    point.source === 'event'
-      ? (events?.find((e) => e._id === point.id)?.document?.title ?? '—')
-      : '—'
+  // Relegated detail of one operation: what it issued, the resulting share
+  // count and the document it was read from. Shown only when the row is open.
+  const detailLine = (point: TimelinePoint) => {
+    const parts: Array<string> = []
+    if (point.sharesIssued != null) {
+      parts.push(
+        t(
+          point.kind === 'entry'
+            ? 'participations:capital.detailSubscribed'
+            : 'participations:capital.detailIssued',
+          { count: point.sharesIssued, shares: fmtShares(point.sharesIssued) },
+        ),
+      )
+    }
+    if (point.totalSharesAfter != null) {
+      parts.push(
+        t('participations:capital.detailTotal', {
+          shares: fmtShares(point.totalSharesAfter),
+        }),
+      )
+    }
+    const title =
+      point.source === 'event'
+        ? events?.find((e) => e._id === point.id)?.document?.title
+        : null
+    if (title) {
+      parts.push(t('participations:capital.detailSource', { title }))
+    }
+    return parts.length > 0
+      ? parts.join(' · ')
+      : t('participations:capital.detailNone')
+  }
 
   async function handleDelete() {
     if (!deleteId) return
@@ -174,6 +205,29 @@ export function CapitalSection({
       ? position.valueCents - position.costCents
       : null
 
+  // The entry point next to today, each label written once. A company with no
+  // operation since the entry shows the left column only.
+  const compareRows = [
+    {
+      label: t('participations:capital.pricePerShare'),
+      entry: fmtEurCents(position.entry.pricePerShareCents),
+      current: fmtEurCents(position.current.pricePerShareCents),
+      down: position.downRound,
+    },
+    {
+      label: t('participations:capital.ownership'),
+      entry: fmtBps(position.entry.ownershipBps),
+      current: fmtBps(position.current.ownershipBps),
+      down: false,
+    },
+    {
+      label: t('participations:capital.companyValuation'),
+      entry: fmtEur(position.entry.postMoneyCents),
+      current: fmtEur(position.current.postMoneyCents),
+      down: false,
+    },
+  ]
+
   return (
     <IdentitySection
       title={t('participations:capital.title')}
@@ -184,199 +238,258 @@ export function CapitalSection({
         </Button>
       }
     >
-      <div className="grid gap-3 sm:grid-cols-3">
-        <SnapshotTile
-          title={t('participations:capital.entry')}
-          snapshot={position.entry}
-          fmtEur={fmtEur}
-          fmtEurCents={fmtEurCents}
-          fmtDate={fmtDate}
-          fmtBps={fmtBps}
-        />
-        <SnapshotTile
-          title={t('participations:capital.current')}
-          snapshot={position.current}
-          fmtEur={fmtEur}
-          fmtEurCents={fmtEurCents}
-          fmtDate={fmtDate}
-          fmtBps={fmtBps}
-          badge={
-            position.downRound ? (
-              <Badge variant="destructive">
+      {/* The one number to read first: what the line is worth today, against
+          what it cost. Every other figure is relegated below it. */}
+      <div className="bg-card space-y-5 rounded-lg border p-5">
+        <div className="space-y-1.5">
+          <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+            {t('participations:capital.lineToday')}
+          </p>
+          <div className="flex flex-wrap items-baseline gap-x-3.5 gap-y-1">
+            <span className="text-3xl font-semibold tracking-tight tabular-nums">
+              {fmtEur(position.valueCents)}
+            </span>
+            {delta != null && delta !== 0 && (
+              <span
+                className={cn(
+                  'text-lg font-semibold tabular-nums',
+                  delta > 0 ? 'text-positive' : 'text-destructive',
+                )}
+              >
+                {delta > 0 ? '+' : ''}
+                {fmtEur(delta)}
+              </span>
+            )}
+            {position.downRound && (
+              <Badge variant="destructive" className="self-center">
                 {t('participations:capital.downRound')}
               </Badge>
-            ) : position.unchanged ? (
-              <span className="text-muted-foreground text-xs">
-                {t('participations:capital.unchanged')}
-              </span>
-            ) : null
-          }
-        />
-        <div className="bg-card rounded-lg border p-4">
-          <p className="text-muted-foreground text-xs font-medium uppercase">
-            {t('participations:capital.line')}
+            )}
+          </div>
+          <p className="text-muted-foreground text-sm">
+            {t('participations:capital.costAndShares', {
+              cost: fmtEur(position.costCents),
+              count: position.sharesHeld,
+              shares: fmtShares(position.sharesHeld),
+            })}
           </p>
-          <dl className="mt-2 space-y-1 text-sm">
-            <Row label={t('participations:capital.value')}>
-              <span className="tabular-nums">
-                {fmtEur(position.valueCents)}
-              </span>
-              {delta != null && delta !== 0 && (
-                <span
-                  className={
-                    delta > 0
-                      ? 'text-positive ml-2 text-xs tabular-nums'
-                      : 'text-destructive ml-2 text-xs tabular-nums'
-                  }
-                >
-                  {delta > 0 ? '+' : ''}
-                  {fmtEur(delta)}
+        </div>
+
+        <Separator />
+
+        <div className="space-y-3">
+          {position.unchanged ? (
+            <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+              <p className="text-muted-foreground text-xs font-medium tracking-wide uppercase">
+                {t('participations:capital.entry')}
+                {position.entry.asOf != null &&
+                  ` · ${fmtDate(position.entry.asOf)}`}
+              </p>
+              <p className="text-muted-foreground text-xs">
+                {t('participations:capital.unchanged')}
+              </p>
+            </div>
+          ) : null}
+
+          <div
+            className={cn(
+              'grid items-baseline gap-x-5 gap-y-2.5',
+              position.unchanged
+                ? 'grid-cols-[minmax(0,1fr)_8rem]'
+                : 'grid-cols-[minmax(0,1fr)_8rem_8rem]',
+            )}
+          >
+            {!position.unchanged && (
+              <>
+                <span />
+                <ColumnHead
+                  label={t('participations:capital.entry')}
+                  date={fmtDate(position.entry.asOf)}
+                />
+                <ColumnHead
+                  label={t('participations:capital.current')}
+                  date={fmtDate(position.current.asOf)}
+                  current
+                />
+              </>
+            )}
+            {compareRows.map((row) => (
+              <Fragment key={row.label}>
+                <span className="text-muted-foreground text-sm">
+                  {row.label}
                 </span>
-              )}
-            </Row>
-            <Row label={t('participations:capital.cost')}>
-              <span className="tabular-nums">{fmtEur(position.costCents)}</span>
-            </Row>
-            <Row label={t('participations:capital.sharesHeld')}>
-              <span className="tabular-nums">
-                {fmtShares(position.sharesHeld)}
-              </span>
-            </Row>
-          </dl>
+                {!position.unchanged && (
+                  <span className="text-muted-foreground text-right text-[15px] tabular-nums">
+                    {row.entry}
+                  </span>
+                )}
+                <span
+                  className={cn(
+                    'text-right text-[15px] font-semibold tabular-nums',
+                    row.down && 'text-destructive',
+                  )}
+                >
+                  {position.unchanged ? row.entry : row.current}
+                </span>
+              </Fragment>
+            ))}
+          </div>
         </div>
       </div>
 
-      {!events ? (
-        <LoadingLine>{t('participations:loading')}</LoadingLine>
-      ) : (
-        <div className="rounded-lg border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('participations:capital.col.date')}</TableHead>
-                <TableHead>{t('participations:capital.col.kind')}</TableHead>
-                <TableHead className="text-right">
-                  {t('participations:capital.col.price')}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('participations:capital.col.issued')}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('participations:capital.col.total')}
-                </TableHead>
-                <TableHead className="text-right">
-                  {t('participations:capital.col.postMoney')}
-                </TableHead>
-                <TableHead>{t('participations:capital.col.source')}</TableHead>
-                <TableHead className="w-12" />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {position.timeline.map((point) => (
-                <TableRow key={`${point.source}:${point.id}`}>
-                  <TableCell>{fmtDate(point.asOf)}</TableCell>
-                  <TableCell className="font-medium">
-                    {t(`participations:capital.kind.${point.kind}`)}
-                    {point.kind === 'entry' && point.sharesIssued != null && (
-                      <span className="text-muted-foreground ml-2 text-xs font-normal">
-                        {t('participations:capital.entrySubscribed', {
-                          count: point.sharesIssued,
-                        })}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtEurCents(point.pricePerShareCents)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {point.kind === 'entry'
-                      ? '—'
-                      : fmtShares(point.sharesIssued)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtShares(point.totalSharesAfter)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtEur(point.postMoneyCents)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[14rem] truncate">
-                    {documentTitle(point)}
-                  </TableCell>
-                  <TableCell>
-                    {point.source === 'event' && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive size-7"
-                        onClick={() =>
-                          setDeleteId(point.id as Id<'capitalEvents'>)
-                        }
-                        aria-label={t('common:actions.delete')}
-                        title={t('common:actions.delete')}
-                      >
-                        <Trash2 className="size-4" />
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-              {proposals.map((e) => (
-                <TableRow key={`proposal:${e._id}`} className="bg-muted/40">
-                  <TableCell>{fmtDate(e.asOf)}</TableCell>
-                  <TableCell className="font-medium">
-                    <div className="flex flex-wrap items-center gap-2">
-                      {t(`participations:capital.kind.${e.kind}`)}
-                      <Badge variant="secondary">
-                        {t('participations:capital.proposed')}
-                      </Badge>
-                    </div>
-                    {e.evidence && (
-                      <p
-                        className="text-muted-foreground mt-1 max-w-[28rem] truncate text-xs font-normal"
-                        title={e.evidence}
-                      >
-                        {e.evidence}
-                      </p>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtEurCents(e.pricePerShare)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtShares(e.sharesIssued)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtShares(e.totalSharesAfter)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {fmtEur(e.totalSharesAfter * e.pricePerShare)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground max-w-[14rem] truncate">
-                    {e.document?.title ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center justify-end gap-1">
-                      <Button
-                        size="sm"
-                        onClick={() => void decide(e._id, true)}
-                      >
-                        {t('participations:capital.confirm')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => void decide(e._id, false)}
-                      >
-                        {t('participations:capital.reject')}
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+      {/* Read in a legal document, waiting for a click. Above the history
+          because it is a to-do, not a fact. */}
+      {proposals.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+            {t('participations:capital.pendingTitle')}
+          </p>
+          {proposals.map((e) => (
+            <div
+              key={e._id}
+              className="bg-muted/40 space-y-2.5 rounded-lg border p-4"
+            >
+              <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
+                <span className="text-sm font-semibold">
+                  {t(`participations:capital.kind.${e.kind}`)}
+                </span>
+                <span className="text-muted-foreground text-sm">
+                  {t('participations:capital.proposalMeta', {
+                    date: fmtDate(e.asOf),
+                    price: fmtEurCents(e.pricePerShare),
+                    shares: fmtShares(e.totalSharesAfter),
+                  })}
+                </span>
+              </div>
+              {e.evidence && (
+                <p
+                  className="text-muted-foreground truncate text-sm italic"
+                  title={e.evidence}
+                >
+                  {e.evidence}
+                </p>
+              )}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="text-muted-foreground min-w-0 truncate text-sm">
+                  {e.document?.title
+                    ? t('participations:capital.detailSource', {
+                        title: e.document.title,
+                      })
+                    : ''}
+                </span>
+                <div className="flex shrink-0 gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void decide(e._id, false)}
+                  >
+                    {t('participations:capital.reject')}
+                  </Button>
+                  <Button size="sm" onClick={() => void decide(e._id, true)}>
+                    {t('participations:capital.confirm')}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
+
+      <div className="space-y-2">
+        <p className="text-muted-foreground text-xs font-medium tracking-wider uppercase">
+          {t('participations:capital.operations')}
+        </p>
+        {!events ? (
+          <LoadingLine>{t('participations:loading')}</LoadingLine>
+        ) : (
+          <div className="rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-28">
+                    {t('participations:capital.col.date')}
+                  </TableHead>
+                  <TableHead>{t('participations:capital.col.kind')}</TableHead>
+                  <TableHead className="w-32 text-right">
+                    {t('participations:capital.col.price')}
+                  </TableHead>
+                  <TableHead className="w-40 text-right">
+                    {t('participations:capital.col.postMoney')}
+                  </TableHead>
+                  <TableHead className="w-10" />
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {position.timeline.map((point) => {
+                  const open = expandedId === point.id
+                  return (
+                    <Fragment key={`${point.source}:${point.id}`}>
+                      <TableRow className={cn(open && 'border-b-0')}>
+                        <TableCell>{fmtDate(point.asOf)}</TableCell>
+                        <TableCell className="font-medium">
+                          {t(`participations:capital.kind.${point.kind}`)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {fmtEurCents(point.pricePerShareCents)}
+                        </TableCell>
+                        <TableCell className="text-right tabular-nums">
+                          {fmtEur(point.postMoneyCents)}
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="size-7"
+                            aria-expanded={open}
+                            aria-label={t(
+                              open
+                                ? 'participations:capital.collapse'
+                                : 'participations:capital.expand',
+                            )}
+                            onClick={() =>
+                              setExpandedId(open ? null : point.id)
+                            }
+                          >
+                            <ChevronDown
+                              className={cn(
+                                'size-4 transition-transform',
+                                open && 'rotate-180',
+                              )}
+                            />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                      {open && (
+                        <TableRow className="hover:bg-transparent">
+                          <TableCell colSpan={5} className="pt-0">
+                            <div className="text-muted-foreground flex flex-wrap items-center justify-between gap-x-4 gap-y-1 text-sm">
+                              <span className="min-w-0">
+                                {detailLine(point)}
+                              </span>
+                              {point.source === 'event' && (
+                                <Button
+                                  variant="link"
+                                  size="sm"
+                                  className="text-destructive h-auto shrink-0 p-0"
+                                  onClick={() =>
+                                    setDeleteId(point.id as Id<'capitalEvents'>)
+                                  }
+                                >
+                                  {t('participations:capital.removeAction')}
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
 
       {adding && (
         <AddCapitalEventDialog
@@ -413,66 +526,31 @@ export function CapitalSection({
   )
 }
 
-function Row({
+/**
+ * Header of one of the two value columns: the moment, then its date under it.
+ * Today's column reads darker, so the eye lands on the current figures.
+ */
+function ColumnHead({
   label,
-  children,
+  date,
+  current = false,
 }: {
   label: string
-  children: React.ReactNode
+  date: string
+  current?: boolean
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="text-right">{children}</dd>
-    </div>
-  )
-}
-
-function SnapshotTile({
-  title,
-  snapshot,
-  badge,
-  fmtEur,
-  fmtEurCents,
-  fmtDate,
-  fmtBps,
-}: {
-  title: string
-  snapshot: CapitalSnapshot
-  badge?: React.ReactNode
-  fmtEur: (cents?: number | null) => string
-  fmtEurCents: (cents?: number | null) => string
-  fmtDate: (ms?: number | null) => string
-  fmtBps: (bps: number | null) => string
-}) {
-  const { t } = useTranslation('participations')
-  return (
-    <div className="bg-card rounded-lg border p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-muted-foreground text-xs font-medium uppercase">
-          {title}
-          {snapshot.asOf != null && (
-            <span className="ml-2 font-normal normal-case">
-              {fmtDate(snapshot.asOf)}
-            </span>
-          )}
-        </p>
-        {badge}
-      </div>
-      <p className="mt-1 text-xl font-semibold tabular-nums">
-        {fmtEur(snapshot.postMoneyCents)}
-      </p>
-      <dl className="mt-2 space-y-1 text-sm">
-        <Row label={t('capital.pricePerShare')}>
-          <span className="tabular-nums">
-            {fmtEurCents(snapshot.pricePerShareCents)}
-          </span>
-        </Row>
-        <Row label={t('capital.ownership')}>
-          <span className="tabular-nums">{fmtBps(snapshot.ownershipBps)}</span>
-        </Row>
-      </dl>
-    </div>
+    <span
+      className={cn(
+        'text-right text-xs font-medium tracking-wide uppercase',
+        current ? 'text-foreground' : 'text-muted-foreground',
+      )}
+    >
+      {label}
+      <span className="text-muted-foreground block text-[11px] font-normal tracking-normal normal-case">
+        {date}
+      </span>
+    </span>
   )
 }
 
