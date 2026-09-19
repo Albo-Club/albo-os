@@ -368,13 +368,18 @@ export const backfillAlbo = internalAction({
       await ctx.runQuery(internal.capitalEventsExtract.listReplayTargets, {
         orgSlug,
       })
-    targets.forEach((t, i) => {
-      void ctx.scheduler.runAfter(
-        i * REPLAY_PACE_MS,
-        internal.capitalEventsExtract.run,
-        { documentId: t.documentId },
-      )
-    })
+    // Awaited on purpose: a schedule still in flight when the action returns
+    // may be dropped (Convex "unawaited operations" warning) — the first prod
+    // replay fired 112 of them and could not tell which ones survived.
+    await Promise.all(
+      targets.map((t, i) =>
+        ctx.scheduler.runAfter(
+          i * REPLAY_PACE_MS,
+          internal.capitalEventsExtract.run,
+          { documentId: t.documentId },
+        ),
+      ),
+    )
     console.log(
       `[capitalEventsExtract] replay ${orgSlug}: ${targets.length} document(s) scheduled`,
     )
