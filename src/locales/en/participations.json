@@ -594,7 +594,8 @@
     "dpi": "DPI",
     "tvpi": "TVPI",
     "valuations": "Valuations",
-    "valEmpty": "No valuation yet — add them via the assistant.",
+    "valEmpty": "No valuation yet — add the fund's NAV with “Adjust”.",
+    "adjust": "Adjust",
     "col": {
       "date": "Date",
       "fairValue": "Fair value",

@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.254.0 — 19/09/2026 à 17:47 — Chaque instrument qui vaut quelque chose peut être valorisé
+
+La section « Valorisation » n'était ouverte qu'aux deals en actions. La version précédente y a ajouté les SAFE, BSA AIR et obligations convertibles. Elle est maintenant ouverte à tout ce qui porte une valeur de ligne : parts de SPV, BSA, parts de véhicule de carried, SCPI, et la dette investie — obligations simples, prêts et comptes courants d'associé, où le geste utile est la **dépréciation** d'un débiteur en difficulté. Le panneau « Fonds » reçoit le même bouton **« Ajuster »**, à côté de son historique, pour saisir la NAV d'un reporting trimestriel sans passer par l'assistant.
+
+Ce qui n'est pas concerné l'est par choix : un placement de trésorerie garde son solde, saisi sur la page Placements ou lu dans un relevé importé ; un bien se valorise dans l'immobilier ; des royalties valent les flux qu'il leur reste à verser, déjà projetés par leur panneau ; un SPV mené est un revenu de gestion, pas une position.
+
+Comme avant, la valorisation la plus récente d'une ligne est celle que lisent le TVPI de la liste des participations, la marge des nantissements et l'assistant IA.
+
+> **🔧 Notes techniques**
+>
+> - Décision matérialisée en **un seul endroit** : `VALUATION_TRACKED_KINDS` + `tracksValuation(kind)` dans `convex/lib/instrumentMapping.ts`, à côté de `isPerformanceDeal` et de `TREASURY_PLACEMENT_KINDS`. Le commentaire du bloc porte l'arbitrage instrument par instrument, y compris les exclusions et leur raison.
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` monte `ValuationSection` sur `tracksValuation(deal.instrumentKind)`, `fund_lp` excepté : son historique vit déjà dans `FundSection`. Le `showsValuationSection` posé par la v1.253.0 dans `ValuationSection.tsx` disparaît au profit du prédicat partagé ; `CAPITAL_DERIVED_KINDS` reste sur place, il répond à une autre question (quel état vide afficher).
+> - Le dialogue « Ajuster » sort de `ValuationSection.tsx` vers `src/components/deals/AdjustValuationDialog.tsx` (aucun changement de comportement), avec le helper de libellé `useValuationLabel()`. `FundSection` l'utilise pour son bouton et pour afficher méthode/source en clair, au lieu des valeurs brutes.
+> - Rien de nouveau côté backend : `valuations.create` et son journal `valuation_added` étaient déjà génériques.
+> - Garde-fou : `tests/valuationTracked.test.ts` assère la liste **exhaustivement** (modèle `tests/performanceDeals.test.ts`) — ouvrir un instrument devient une édition délibérée.
+> - Hors périmètre, à cadrer séparément : propager un tour de la société cible aux parts de SPV, et importer les NAV depuis les rapports trimestriels sur le modèle de `convex/capitalEventsExtract.ts`.
+
 ## v1.253.0 — 19/09/2026 à 17:22 — « Capital et valorisation » va droit au but
 
 La section de la fiche société est refaite pour se lire d'un coup d'œil. Les trois tuiles qui répétaient les mêmes libellés laissent la place à **un seul chiffre en tête** : ce que vaut notre ligne aujourd'hui, avec l'**écart au coût** à côté, en vert ou en rouge. Le badge **Down round** s'affiche là, à côté du chiffre, plutôt que perdu dans une tuile.

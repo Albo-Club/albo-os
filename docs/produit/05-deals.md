@@ -75,20 +75,34 @@ visible pendant qu'on fait défiler la page.
   trimestre et les réels — les écarts et le BP dégradé sont calculés à
   l'affichage. Les paramètres (capital investi, taux, multiples, dates) sont
   dans le panneau de droite, comme pour tout autre instrument.
-- **Section Fonds** (engagements LP) : appels et distributions.
-- **Valorisation** (deals en actions, SAFE, BSA AIR, obligations
-  convertibles) :
-  l'historique des valorisations de la ligne — date, valeur, méthode, source —
-  dont la plus récente est celle que lit le TVPI. Les lignes arrivent de trois
-  côtés : un **tour confirmé** dans « Capital et valorisation » de la fiche
-  société (titres détenus × nouveau prix, daté du tour), un relevé importé, ou
-  le bouton **« Ajuster »** de cette section, qui fixe la valeur à la main à
-  une date : une **dépréciation** ou une valorisation manuelle, qui prend le
-  dessus jusqu'au prochain tour confirmé. Retirer l'opération sur la fiche
-  société retire la valorisation qu'elle avait produite. Les tours confirmés
-  ne valorisent que les **actions détenues** : sur un SAFE, un BSA AIR ou une
-  obligation convertible, encore non converti en titres, la section n'attend
-  que les ajustements manuels.
+- **Section Fonds** (engagements LP) : appels et distributions, et
+  l'historique des valorisations du fonds avec son bouton **« Ajuster »**
+  pour saisir la NAV du reporting.
+- **Valorisation** : l'historique des valorisations de la ligne — date,
+  valeur, méthode, source — dont la plus récente est celle que lit le TVPI.
+  Les lignes arrivent de trois côtés : un **tour confirmé** dans « Capital et
+  valorisation » de la fiche société (titres détenus × nouveau prix, daté du
+  tour), un relevé importé, ou le bouton **« Ajuster »** de cette section,
+  qui fixe la valeur à la main à une date : une **dépréciation** ou une
+  valorisation manuelle, qui prend le dessus jusqu'au prochain tour confirmé.
+  Retirer l'opération sur la fiche société retire la valorisation qu'elle
+  avait produite. Les tours confirmés ne valorisent que les **actions
+  détenues** : partout ailleurs — un SAFE, un BSA AIR ou une obligation
+  convertible pas encore convertis en titres, une obligation simple, une
+  SCPI — la section n'attend que les ajustements manuels.
+
+  Tous les instruments ne portent pas cette section : elle est là pour les
+  **actions**, les **parts de SPV**, les **BSA**, les **SAFE / BSA AIR**, les
+  **obligations convertibles**, les **parts de véhicule de carried**, la
+  **dette investie** (obligations simples, prêts, comptes courants — où le
+  geste utile est la dépréciation d'un débiteur en difficulté), les **fonds**
+  (dans la section Fonds) et les **SCPI**. Elle est absente là où la valeur
+  se saisit ailleurs ou n'a pas de sens : les **placements de trésorerie**
+  ont leur solde sur la [page Placements](19-placements.md) et par import de
+  relevé, l'**immobilier direct** se valorise dans
+  l'[immobilier](20-immobilier.md), les **royalties** valent leurs flux
+  restants (déjà projetés par leur panneau) et un **SPV mené** est un revenu
+  de gestion, pas une position.
 - **Business plan vs réalisé** : graphique et tableau comparant le BP initial
   (figé au closing), le BP révisé et le réel. La saisie du BP se fait via
   l'[assistant IA](11-assistant-ia.md) (coller le BP suffit), pas par un

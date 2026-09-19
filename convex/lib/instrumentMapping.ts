@@ -157,6 +157,54 @@ export function isPerformanceDeal(kind: string): boolean {
   return INSTRUMENT_ARCHETYPE[kind as InstrumentKind] !== 'management'
 }
 
+/**
+ * Instruments whose deal carries a VALUATION history — the `valuations` rows
+ * read back as the line's current value (deals:lastValuationCents), which
+ * feeds the TVPI of the participations list, the pledge margins, the agent
+ * and the MCP.
+ *
+ * Closed list, arbitrated with Benjamin (ALB-248). What earns a place is a
+ * value someone can actually provide: the equity and quasi-equity kinds (the
+ * last round, or a write-down to zero when the target dies), the invested
+ * debt (worth its outstanding principal, so cost by default — the one useful
+ * entry is the impairment of a defaulting borrower), a fund's NAV from its
+ * reporting, and the share price a SCPI's management company publishes.
+ *
+ * Deliberately OUT, each for its own reason:
+ *   - the treasury placements (TREASURY_PLACEMENT_KINDS): they already have a
+ *     valuation path — the `currentValue` field and the statement import,
+ *     which BOTH write a `valuations` row themselves. A second path that did
+ *     not also write `currentValue` would drift the Placements balance away
+ *     from the last valuation.
+ *   - `real_estate_direct`: a building is valued in the real-estate module
+ *     (`propertyValuations`), not on the deal.
+ *   - `royalty`: the line is worth its remaining contractual flows, which the
+ *     royalties panel already projects — a NAV on top would double-count.
+ *   - `lead_spv`: management revenue, not capital at risk (isPerformanceDeal).
+ *   - `unknown`: the Attio-sync fallback, until the real instrument is set.
+ */
+export const VALUATION_TRACKED_KINDS: ReadonlySet<InstrumentKind> = new Set([
+  'share',
+  'spv_share',
+  'bsa',
+  'safe',
+  'bsa_air',
+  'oc',
+  'convertible_note',
+  'carry_vehicle',
+  'os',
+  'loan',
+  'cca',
+  'fund_lp',
+  'scpi',
+])
+
+/** Whether a deal's sheet offers a valuation history (loose string overload
+ * for front rows typed `instrumentKind: string`). */
+export function tracksValuation(kind: string): boolean {
+  return VALUATION_TRACKED_KINDS.has(kind as InstrumentKind)
+}
+
 /** instrumentKind → render mode. Total Record (every InstrumentKind). */
 export const INSTRUMENT_RENDER: Record<InstrumentKind, RenderMode> = {
   share: 'fields',
