@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.250.1 — 19/09/2026 à 15:21 — Ménage : le backend de l'ancien tableau de bord s'en va
+## v1.250.2 — 19/09/2026 à 15:21 — Ménage : le backend de l'ancien tableau de bord s'en va
 
 Rien ne change dans l'application. Le calcul qui alimentait l'ancien tableau
 de bord, page retirée il y a plusieurs mois, vivait encore dans le code sans
@@ -47,6 +47,15 @@ que rien ne l'appelle. Il est supprimé.
 >   un `.collect()` de toute la table `transactions` rendait la page lente,
 >   d'où les lectures indexées par deal. Les deux commentaires de
 >   `agentTools.ts` qui pointaient vers le fichier renvoient désormais là.
+## v1.250.1 — 19/09/2026 à 15:05 — La reprise des opérations sur le capital attend ses lectures
+
+Correctif technique : la reprise de l'historique des documents juridiques (lancée une fois après la v1.249.0) rendait la main avant d'avoir fini d'enregistrer ses lectures, si bien qu'une partie des analyses pouvait ne jamais démarrer sans que rien ne le signale. Elle attend désormais que chaque lecture soit bien planifiée avant de conclure. La commande est à relancer une fois ; les documents déjà lus avec succès sont sautés.
+
+> **🔧 Notes techniques**
+>
+> - `convex/capitalEventsExtract.ts` `backfillAlbo` : la boucle `void ctx.scheduler.runAfter(...)` devient `await Promise.all(targets.map(...))`. Le premier lancement prod a émis l'avertissement Convex « 112 unawaited operations: [schedule] » — une planification encore en vol au retour de l'action peut être abandonnée.
+> - `convex/regression.capitalEvents.test.ts` : nouveau cas — après `backfillAlbo`, `_scheduled_functions` porte bien un `capitalEventsExtract:run` par document source.
+> - `MIGRATIONS.md` : la ligne de reprise précise la relance.
 
 ## v1.250.0 — 19/09/2026 à 13:06 — Piloter un SPV rapporte, ce n'est pas investir
 

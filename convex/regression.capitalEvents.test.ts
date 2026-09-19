@@ -454,6 +454,27 @@ describe('capitalEventsExtract: which documents are read', () => {
     })
     expect(await scheduledRuns()).toBe(before + 2)
   })
+
+  test('the replay schedules one read per source document before returning', async () => {
+    const base = await setupWithShareDeal('org-capital-replay')
+    const { t } = base
+    await dropLegalDoc(base, 'pacte.pdf', 'pacte')
+    await dropLegalDoc(base, 'pv-decembre.pdf', 'pv')
+    const scheduledRuns = async () =>
+      (
+        await t.run(async (ctx) =>
+          ctx.db.system.query('_scheduled_functions').collect(),
+        )
+      ).filter((row) => row.name === 'capitalEventsExtract:run').length
+
+    const before = await scheduledRuns()
+    const result = await t.action(internal.capitalEventsExtract.backfillAlbo, {
+      orgSlug: 'org-capital-replay',
+    })
+    expect(result.scheduled).toBe(2)
+    // Both schedules are registered by the time the action has returned.
+    expect(await scheduledRuns()).toBe(before + 2)
+  })
 })
 
 describe('capital operations on both AI facades', () => {
