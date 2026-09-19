@@ -655,7 +655,13 @@
     "deleted": "Operation removed",
     "deleteConfirmTitle": "Remove this operation?",
     "deleteConfirmDescription": "The timeline and the current valuation will be recomputed without it.",
+    "proposed": "Proposed",
+    "confirm": "Confirm",
+    "reject": "Refuse",
+    "confirmed": "Operation confirmed",
+    "rejected": "Proposal refused",
     "errors": {
+      "not_proposed": "This operation is no longer a proposal.",
       "invalid_price": "The price per share must be a positive amount.",
       "invalid_shares": "The share count must be a positive integer.",
       "invalid_amount": "The amount raised must be positive.",

@@ -36,6 +36,7 @@ import {
   internalQuery,
 } from './_generated/server'
 import { getModel } from './agent'
+import { CAPITAL_SOURCE_KINDS } from './lib/capitalExtraction'
 
 import type { Doc, Id } from './_generated/dataModel'
 
@@ -197,6 +198,13 @@ export const apply = internalMutation({
       await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
         documentId,
       })
+      // A pacte, a bulletin or a PV on a company: read the operations on
+      // the capital it describes (proposals only — the run checks the rest).
+      if (anchor === 'company' && CAPITAL_SOURCE_KINDS.has(kind)) {
+        await ctx.scheduler.runAfter(0, internal.capitalEventsExtract.run, {
+          documentId,
+        })
+      }
     }
     return null
   },
