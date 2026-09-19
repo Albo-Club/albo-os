@@ -27,6 +27,9 @@ export const CAPITAL_EVENT_KINDS = [
   'other',
 ] as const
 export type CapitalEventKind = (typeof CAPITAL_EVENT_KINDS)[number]
+/** `valuations.source` of a row derived from a confirmed capital operation. */
+export const CAPITAL_EVENT_VALUATION_SOURCE = 'capital_event'
+
 export const capitalEventKindValidator = literals(...CAPITAL_EVENT_KINDS)
 
 /** One of our own share deals in the company — the entry round(s). */

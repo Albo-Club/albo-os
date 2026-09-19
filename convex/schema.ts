@@ -1203,10 +1203,14 @@ export default defineSchema({
     source: v.optional(v.string()),
     notes: v.optional(v.string()),
     airtableId: v.optional(v.string()), // Airtable import anchor
+    // Set on a row derived from a confirmed capital operation (shares held ×
+    // the round's price, source `capital_event`) — removed with the operation.
+    capitalEventId: v.optional(v.id('capitalEvents')),
   })
     .index('by_deal_asof', ['dealId', 'asOf'])
     .index('by_org_asof', ['orgId', 'asOf'])
-    .index('by_airtable_id', ['airtableId']),
+    .index('by_airtable_id', ['airtableId'])
+    .index('by_capital_event', ['capitalEventId']),
 
   /**
    * capitalEvents — operations on a portfolio company's share capital, over

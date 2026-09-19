@@ -956,5 +956,42 @@
     "lastComm_other": "Dernière communication il y a {{count}} mois",
     "never": "Aucun report reçu — un état des lieux de départ manque (fonds versés le {{date}})",
     "coverage": "Couverture jusqu'au {{date}}"
+  },
+  "valuation": {
+    "title": "Valorisation",
+    "adjust": "Ajuster",
+    "empty": "Aucune valorisation : la ligne vaut ce qui a été versé. Un tour confirmé dans « Capital et valorisation » ou un ajustement manuel la fixe.",
+    "col": {
+      "date": "Date",
+      "fairValue": "Valeur de la ligne",
+      "method": "Méthode",
+      "source": "Source"
+    },
+    "method": {
+      "last_round": "Dernier tour",
+      "impairment": "Dépréciation",
+      "manual": "Manuelle",
+      "mark_to_market": "Valeur de marché"
+    },
+    "source": {
+      "capital_event": "Opération sur le capital",
+      "manual": "Saisie manuelle",
+      "statement_import": "Relevé importé",
+      "balance_update": "Mise à jour du solde"
+    },
+    "dialog": {
+      "title": "Ajuster la valorisation",
+      "description": "Fixe la valeur actuelle de la ligne à la date choisie. Une dépréciation prend le dessus jusqu'au prochain tour confirmé.",
+      "asOf": "Date",
+      "method": "Méthode",
+      "fairValue": "Valeur de la ligne (€)",
+      "notes": "Note (facultatif)"
+    },
+    "saved": "Valorisation enregistrée",
+    "errors": {
+      "default": "Impossible d'enregistrer la valorisation.",
+      "invalid_amount": "Le montant doit être strictement positif.",
+      "invalid_date": "Date invalide."
+    }
   }
 }
