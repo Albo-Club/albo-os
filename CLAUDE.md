@@ -654,6 +654,20 @@ export const remove = mutation({
   (no table of its own in the participations list, hidden from the deals list
   until the Status facet asks for it) — see `docs/produit/05-deals.md`
   § « Annuler un deal ».
+- ❌ Compter un deal de **rémunération** dans une figure de performance. Un
+  `lead_spv` (archétype `management`) porte ce qu'une société du groupe
+  **gagne** en pilotant un SPV pour d'autres investisseurs — frais de gestion
+  et carried. Ses sorties sont des frais avancés, pas du capital placé : les
+  compter a donné un MOIC de 2,84x et un TRI de 635 % à des lignes qui
+  n'avaient jamais rien investi, et a gonflé le déployé comme le distribué
+  d'argent qui n'était ni l'un ni l'autre. Le filtre unique est
+  `isPerformanceDeal` (`convex/lib/instrumentMapping.ts`) : tout nouveau KPI,
+  export ou outil agent qui agrège des deals doit l'appeler — et comme les
+  lignes de participation se groupent par société **cible**, l'oubli ne se
+  voit pas sur une ligne à part, il pollue le TVPI de l'investissement voisin.
+  Le critère n'est pas « le montant est petit » mais « cet euro a-t-il été
+  investi ? » : `carry_vehicle`, une part **détenue** dans une structure de
+  carried, reste une performance — la mise est réelle, même nominale.
 - ❌ Adding a `companies.sector` value that describes the **vehicle** (SPV,
   fund, studio, carried structure) or a transversal **lens** (climate,
   impact), or writing a free-typed sector from code. The canonical list is

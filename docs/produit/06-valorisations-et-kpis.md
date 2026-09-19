@@ -79,6 +79,14 @@ deals (voir [Pointage](08-pointage.md)) :
   TRI, et il ne compte ni dans le capital déployé, ni dans le distribué, ni
   dans la NAV. Un remboursement n'est pas un retour. Le détail est dans
   [Deals](05-deals.md) § « Annuler un deal ».
+- **Un deal de rémunération de SPV non plus** : piloter un SPV pour d'autres
+  investisseurs rapporte des frais de gestion et du carried, et c'est un
+  revenu d'activité, pas un capital placé. Ces deals sortent donc du déployé,
+  du distribué, de la NAV et du nombre de participations, et n'affichent ni
+  MOIC ni TRI — un multiple calculé sur des frais avancés annoncerait un
+  rendement qui n'existe pas. Leurs mouvements restent visibles sur la fiche
+  du deal. À ne pas confondre avec une **participation dans une structure de
+  carried**, qui est un vrai investissement et garde toutes ses métriques.
 
 ## Pages liées
 
