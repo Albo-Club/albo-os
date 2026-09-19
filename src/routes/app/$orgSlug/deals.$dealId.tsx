@@ -17,7 +17,10 @@ import { toast } from 'sonner'
 import { ConvexError } from 'convex/values'
 import { api } from '../../../../convex/_generated/api'
 
-import { INSTRUMENT_FIELDS } from '../../../../convex/lib/instrumentMapping'
+import {
+  INSTRUMENT_FIELDS,
+  tracksValuation,
+} from '../../../../convex/lib/instrumentMapping'
 import type { Doc, Id } from '../../../../convex/_generated/dataModel'
 import type { DealOption } from '~/components/pointage/DealCombobox'
 import type { TxDetails } from '~/components/pointage/TransactionSheet'
@@ -845,11 +848,14 @@ function DealDetail() {
               realized layer is the Transactions section above. */}
           <DealForecastSection dealId={deal._id} orgId={deal.orgId} />
 
-          {/* Valuation history of a share deal (feeds its TVPI): rounds
-              confirmed on the company sheet + manual adjustments. */}
-          {deal.instrumentKind === 'share' && (
-            <ValuationSection dealId={deal._id} />
-          )}
+          {/* Valuation history of the instruments that track one (closed
+              list: tracksValuation): rounds confirmed on the company sheet,
+              imports and manual adjustments. fund_lp tracks a valuation too,
+              but its history lives in the fund panel below. */}
+          {tracksValuation(deal.instrumentKind) &&
+            deal.instrumentKind !== 'fund_lp' && (
+              <ValuationSection dealId={deal._id} />
+            )}
 
           {deal.instrumentKind === 'fund_lp' && (
             <FundSection

@@ -594,7 +594,8 @@
     "dpi": "DPI",
     "tvpi": "TVPI",
     "valuations": "Valorisations",
-    "valEmpty": "Aucune valorisation — ajoute-les via l'assistant.",
+    "valEmpty": "Aucune valorisation — ajoute la NAV du fonds avec « Ajuster ».",
+    "adjust": "Ajuster",
     "col": {
       "date": "Date",
       "fairValue": "Fair value",
@@ -960,7 +961,7 @@
   "valuation": {
     "title": "Valorisation",
     "adjust": "Ajuster",
-    "empty": "Aucune valorisation : la ligne vaut ce qui a été versé. Un tour confirmé dans « Capital et valorisation » ou un ajustement manuel la fixe.",
+    "empty": "Aucune valorisation : la ligne vaut ce qui a été versé. Un ajustement manuel la fixe — et, pour les actions, un tour confirmé dans « Capital et valorisation ».",
     "col": {
       "date": "Date",
       "fairValue": "Valeur de la ligne",

@@ -594,7 +594,8 @@
     "dpi": "DPI",
     "tvpi": "TVPI",
     "valuations": "Valuations",
-    "valEmpty": "No valuation yet — add them via the assistant.",
+    "valEmpty": "No valuation yet — add the fund's NAV with “Adjust”.",
+    "adjust": "Adjust",
     "col": {
       "date": "Date",
       "fairValue": "Fair value",
@@ -960,7 +961,7 @@
   "valuation": {
     "title": "Valuation",
     "adjust": "Adjust",
-    "empty": "No valuation yet: the line is worth what was paid. A round confirmed under “Capital and valuation” or a manual adjustment sets it.",
+    "empty": "No valuation yet: the line is worth what was paid. A manual adjustment sets it — as does, for shares, a round confirmed under “Capital and valuation”.",
     "col": {
       "date": "Date",
       "fairValue": "Line value",

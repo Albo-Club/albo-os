@@ -1,3 +1,5 @@
+import { useState } from 'react'
+import { Plus } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useConvexQuery } from '@convex-dev/react-query'
 
@@ -5,6 +7,11 @@ import { api } from '../../../convex/_generated/api'
 import { dpi as dpiRatio, tvpi as tvpiRatio } from '../../../convex/lib/metrics'
 import type { Id } from '../../../convex/_generated/dataModel'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
+import {
+  AdjustValuationDialog,
+  useValuationLabel,
+} from '~/components/deals/AdjustValuationDialog'
+import { Button } from '~/components/ui/button'
 import {
   Table,
   TableBody,
@@ -34,6 +41,8 @@ export function FundSection({
   const { t, i18n } = useTranslation('participations')
   const { fmtEur, fmtEurCents, fmtDate } = useFormatters()
   const valuations = useConvexQuery(api.valuations.list, { dealId })
+  const label = useValuationLabel()
+  const [adjustOpen, setAdjustOpen] = useState(false)
 
   const lastFairValue = valuations?.at(0)?.fairValue ?? null
   const fmtMultiple = (ratio: number | null) =>
@@ -78,7 +87,13 @@ export function FundSection({
         ))}
       </div>
 
-      <h3 className="text-sm font-semibold">{t('fund.valuations')}</h3>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold">{t('fund.valuations')}</h3>
+        <Button variant="outline" size="sm" onClick={() => setAdjustOpen(true)}>
+          <Plus className="size-4" />
+          {t('fund.adjust')}
+        </Button>
+      </div>
       {!valuations ? (
         <LoadingLine>{t('loading')}</LoadingLine>
       ) : valuations.length === 0 ? (
@@ -105,13 +120,26 @@ export function FundSection({
                   <TableCell className="text-right tabular-nums">
                     {fmtEur(valuation.fairValue)}
                   </TableCell>
-                  <TableCell>{valuation.valuationMethod ?? '—'}</TableCell>
-                  <TableCell>{valuation.source ?? '—'}</TableCell>
+                  <TableCell>
+                    {label('method', valuation.valuationMethod)}
+                  </TableCell>
+                  <TableCell>
+                    <span title={valuation.notes ?? undefined}>
+                      {label('source', valuation.source)}
+                    </span>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
         </div>
+      )}
+
+      {adjustOpen && (
+        <AdjustValuationDialog
+          dealId={dealId}
+          onClose={() => setAdjustOpen(false)}
+        />
       )}
     </section>
   )

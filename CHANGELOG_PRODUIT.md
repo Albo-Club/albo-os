@@ -23,6 +23,23 @@ bas de page.
 
 ---
 
+## v1.252.0 — 19/09/2026 à 17:44 — Chaque instrument qui vaut quelque chose peut être valorisé
+
+La section « Valorisation » n'était ouverte qu'aux deals en actions. Elle l'est maintenant à tout ce qui porte une valeur de ligne : parts de SPV, BSA, SAFE et BSA AIR, obligations convertibles, parts de véhicule de carried, SCPI, et la dette investie — obligations simples, prêts et comptes courants d'associé, où le geste utile est la **dépréciation** d'un débiteur en difficulté. Le panneau « Fonds » reçoit le même bouton **« Ajuster »**, à côté de son historique, pour saisir la NAV d'un reporting trimestriel sans passer par l'assistant.
+
+Ce qui n'est pas concerné l'est par choix : un placement de trésorerie garde son solde, saisi sur la page Placements ou lu dans un relevé importé ; un bien se valorise dans l'immobilier ; des royalties valent les flux qu'il leur reste à verser, déjà projetés par leur panneau ; un SPV mené est un revenu de gestion, pas une position.
+
+Comme avant, la valorisation la plus récente d'une ligne est celle que lisent le TVPI de la liste des participations, la marge des nantissements et l'assistant IA.
+
+> **🔧 Notes techniques**
+>
+> - Décision matérialisée en **un seul endroit** : `VALUATION_TRACKED_KINDS` + `tracksValuation(kind)` dans `convex/lib/instrumentMapping.ts`, à côté de `isPerformanceDeal` et de `TREASURY_PLACEMENT_KINDS`. Le commentaire du bloc porte l'arbitrage instrument par instrument, y compris les exclusions et leur raison.
+> - `src/routes/app/$orgSlug/deals.$dealId.tsx` monte `ValuationSection` sur `tracksValuation(deal.instrumentKind)` (au lieu de `=== 'share'`), `fund_lp` excepté : son historique vit déjà dans `FundSection`.
+> - Le dialogue « Ajuster » sort de `ValuationSection.tsx` vers `src/components/deals/AdjustValuationDialog.tsx` (aucun changement de comportement), avec le helper de libellé `useValuationLabel()`. `FundSection` l'utilise pour son bouton et pour afficher méthode/source en clair, au lieu des valeurs brutes.
+> - Rien de nouveau côté backend : `valuations.create` et son journal `valuation_added` étaient déjà génériques.
+> - Garde-fou : `tests/valuationTracked.test.ts` assère la liste **exhaustivement** (modèle `tests/performanceDeals.test.ts`) — ouvrir un instrument devient une édition délibérée.
+> - Hors périmètre, à cadrer séparément : propager un tour de la société cible aux parts de SPV, et importer les NAV depuis les rapports trimestriels sur le modèle de `convex/capitalEventsExtract.ts`.
+
 ## v1.251.0 — 19/09/2026 à 15:50 — Un tour confirmé valorise la ligne
 
 Un tour de table confirmé dans « Capital et valorisation » fixe désormais la valeur de nos lignes en actions dans la société : titres détenus × nouveau prix, à la date du tour. Cette valeur devient la valorisation courante du deal — celle que lisent le TVPI de la liste des participations, la marge des nantissements et l'assistant IA. Supprimer l'opération ramène la valorisation d'avant. Un deal sans nombre d'actions renseigné, déjà sorti, ou entré après le tour n'est pas touché.
