@@ -355,6 +355,20 @@ function Sentence({ row, orgSlug }: { row: Row; orgSlug: string }) {
           : t('activity.ev.people_edited')
       break
     }
+    case 'capital_event_added':
+      text = t('activity.ev.capital_event_added', {
+        kind: t(`capital.kind.${event.capitalKind}`),
+        date: fmtDate(event.asOf),
+        price: fmtEurCents(event.pricePerShareCents),
+        total: event.totalSharesAfter.toLocaleString(i18n.language),
+      })
+      break
+    case 'capital_event_removed':
+      text = t('activity.ev.capital_event_removed', {
+        kind: t(`capital.kind.${event.capitalKind}`),
+        date: fmtDate(event.asOf),
+      })
+      break
     case 'kpi_added':
       text = t('activity.ev.kpi_added', {
         metric: event.metricType,

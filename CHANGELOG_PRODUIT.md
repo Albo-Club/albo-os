@@ -23,6 +23,53 @@ bas de page.
 
 ---
 
+## v1.248.0 — 19/09/2026 à 11:45 — Capital et valorisation : l'entrée face à aujourd'hui sur la fiche société
+
+Sur une participation détenue en actions, la fiche société gagne une section
+**Capital et valorisation**. Trois tuiles : ce que valait la société **à
+notre entrée** (post-money, prix par action, détention, tels que le deal les
+porte), ce qu'elle vaut **aujourd'hui** au dernier prix connu, avec la
+détention diluée, et **notre ligne** (titres × dernier prix, face au coût).
+En dessous, la frise des opérations sur le capital : notre entrée, puis
+chaque tour, exercice de BSA, conversion ou secondaire que vous saisissez
+depuis « Ajouter une opération », avec son document source. Le post-money
+n'est jamais saisi : il se déduit des actions totales et du prix. Un prix
+sous celui de l'entrée affiche un badge **Down round**.
+
+Sur ACT Running, saisir le tour de décembre 2025 (80 €, 40 000 actions)
+donne 3,2 M€ aujourd'hui contre 3 M€ à l'entrée, une détention qui passe de
+0,83 % à 0,78 %, et une ligne toujours à 25 040 € : même prix, pas de plus-
+value, juste la dilution. Cette lecture est informative pour l'instant :
+TVPI et NAV ne changent pas, la fiche deal non plus. Un document cité par une
+opération ne peut plus être supprimé tant qu'elle existe. Chaque ajout et
+retrait s'inscrit dans l'Activité de la fiche.
+
+> **🔧 Notes techniques**
+>
+> - Table `capitalEvents` (`convex/schema.ts` : date, type, prix/action,
+>   actions émises et totales, taille et type de tour, `documentId`, notes,
+>   auteur ; index `by_company_asof`, `by_document`). L'entrée n'est **pas**
+>   une ligne : `convex/lib/capitalPosition.ts` (`computeCapitalPosition`,
+>   pur) la dérive du deal et calcule entrée / actuel / valeur / down round.
+> - `convex/capitalEvents.ts` : `listByCompany`, `create`, `remove`
+>   (`requireOrgMember`, validations, document limité à la société).
+>   Journal : `capital_event_added` / `capital_event_removed`, table dans
+>   `JOURNALED` (`tests/journalGuards.test.ts`).
+> - Garde-fous : `companies.listBlockingRefs` compte les opérations,
+>   `documents:remove` refuse un document cité
+>   (`document_cited_by_capital_event`).
+> - Front : `src/components/companies/CapitalSection.tsx` monté sous les
+>   deals dans `participations.$companyId.tsx`, libellés `capital.*` (en/fr),
+>   nouveaux cas dans `CompanyActivitySection`. Aucun outil agent/MCP dans ce
+>   lot (décision explicite, les deux façades arrivent au lot 2).
+> - Tests : `tests/capitalPosition.test.ts` (cas ACT Running),
+>   `convex/regression.capitalEvents.test.ts`, cas journal dans
+>   `regression.companyEvents.test.ts`. `convex/_generated/api.d.ts` complété
+>   à la main du module (le fichier est commité et `convex codegen` exige un
+>   déploiement ; `convex dev` le régénère à l'identique).
+
+---
+
 ## v1.247.2 — 19/09/2026 à 11:10 — L'historique des notes de santé se reconstitue depuis le 07/08
 
 La note de santé garde son histoire depuis hier, mais elle partait de zéro :
@@ -60,6 +107,8 @@ d'après.
 >   le fichier versionné avait pris du retard (modules `lib/*` et plusieurs
 >   migrations absents), le diff les rattrape.
 > - Runbook dans `MIGRATIONS.md`.
+
+---
 
 ## v1.247.1 — 18/09/2026 à 23:25 — Le backfill documentaire ne confond plus le tour suivant avec le tour d'entrée
 

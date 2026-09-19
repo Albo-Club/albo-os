@@ -2418,6 +2418,25 @@ Trois choses non évidentes qui coûteraient cher à redécouvrir :
 Le critère d'efficacité de la suite a été vérifié : commenter le
 `requireOrgMember` de `deals.list` fait rougir 2 tests (isolation lecture).
 
+## Capital et valorisation : l'entrée n'est pas une ligne
+
+`capitalEvents` (convex/capitalEvents.ts) ne stocke que les opérations
+**postérieures** à notre entrée. Le tour d'entrée reste sur le deal
+(`pricePerShare`, `sharesAcquired`, `postMoneyValuation`, `closingDate`) et
+la section « Capital et valorisation » le **dérive** (`dealPoint` dans
+`convex/lib/capitalPosition.ts`), tout comme le nombre d'actions en
+circulation à l'entrée (`postMoneyValuation ÷ pricePerShare`, sinon
+`companies.totalShares`) et le post-money de chaque opération
+(`totalSharesAfter × pricePerShare`). Le réflexe à combattre : insérer une
+ligne « entrée » pour que la frise soit complète, ou stocker le post-money
+pour éviter un calcul. Les deux créent une seconde vérité qui se
+désynchronise dès qu'on corrige le deal — c'est exactement l'écart
+qu'ALB-248 a fait remonter (cf. piège n° 5 ci-dessous). Une opération peut
+citer un document source (`documentId`) : `documents:remove` et
+`companies:remove` refusent alors la suppression
+(`document_cited_by_capital_event`, `company_has_references`), comme pour
+toute table qui référence une assiette existante.
+
 ## Backfill depuis la doc juridique — 5 pièges
 
 `scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`

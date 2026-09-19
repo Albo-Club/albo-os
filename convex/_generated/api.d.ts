@@ -27,6 +27,7 @@ import type * as airtableImport from "../airtableImport.js";
 import type * as attio from "../attio.js";
 import type * as attioSync from "../attioSync.js";
 import type * as auth from "../auth.js";
+import type * as capitalEvents from "../capitalEvents.js";
 import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
 import type * as companies from "../companies.js";
@@ -219,6 +220,7 @@ declare const fullApi: ApiFromModules<{
   attio: typeof attio;
   attioSync: typeof attioSync;
   auth: typeof auth;
+  capitalEvents: typeof capitalEvents;
   cash: typeof cash;
   chat: typeof chat;
   companies: typeof companies;

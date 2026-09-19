@@ -146,6 +146,7 @@ async function listBlockingRefs(
     accounts,
     docs,
     orgDeals,
+    capitalEvents,
   ] = await Promise.all([
     ctx.db
       .query('deals')
@@ -190,6 +191,10 @@ async function listBlockingRefs(
       .query('deals')
       .withIndex('by_org', (q) => q.eq('orgId', orgId))
       .collect(),
+    ctx.db
+      .query('capitalEvents')
+      .withIndex('by_company_asof', (q) => q.eq('companyId', companyId))
+      .collect(),
   ])
   return {
     dealsAsTarget: asTarget.length,
@@ -200,6 +205,7 @@ async function listBlockingRefs(
     kpiSnapshots: kpis.length,
     bankAccounts: accounts.length,
     documents: docs.length,
+    capitalEvents: capitalEvents.length,
   }
 }
 

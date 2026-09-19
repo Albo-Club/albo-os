@@ -552,6 +552,13 @@ export const remove = mutation({
     const doc = await ctx.db.get('documents', documentId)
     if (!doc) throw new ConvexError('not_found')
     const { user } = await requireOrgMember(ctx, doc.orgId)
+    // A paper that backs an operation on the capital stays: the operation
+    // would lose its source in silence (cf. capitalEvents.documentId).
+    const cited = await ctx.db
+      .query('capitalEvents')
+      .withIndex('by_document', (q) => q.eq('documentId', documentId))
+      .first()
+    if (cited) throw new ConvexError('document_cited_by_capital_event')
     await ctx.db.delete('documents', documentId)
     // Mirror of the attach event: the journal must show the removal too.
     const deal = doc.dealId ? await ctx.db.get('deals', doc.dealId) : null

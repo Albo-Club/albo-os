@@ -39,6 +39,7 @@ const JOURNALED: Record<string, Array<string>> = {
   documents: ['logDealEvent(', 'logCompanyEvent('],
   companies: ['logCompanyEvent(', 'diffCompanyPatch('],
   kpiSnapshots: ['logCompanyEvent('],
+  capitalEvents: ['logCompanyEvent('],
   dealProjections: ['logDealEvent('],
   // Journaled on the deal the rule is tied to — a rule without a deal, like
   // the capital and current accounts of the passif, has no sheet to show on
