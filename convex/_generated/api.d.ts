@@ -11,6 +11,7 @@
 import type * as admin from "../admin.js";
 import type * as agent from "../agent.js";
 import type * as agentTools from "../agentTools.js";
+import type * as agentToolsCapital from "../agentToolsCapital.js";
 import type * as agentToolsDebt from "../agentToolsDebt.js";
 import type * as agentToolsDocuments from "../agentToolsDocuments.js";
 import type * as agentToolsForecasts from "../agentToolsForecasts.js";
@@ -28,6 +29,7 @@ import type * as attio from "../attio.js";
 import type * as attioSync from "../attioSync.js";
 import type * as auth from "../auth.js";
 import type * as capitalEvents from "../capitalEvents.js";
+import type * as capitalEventsExtract from "../capitalEventsExtract.js";
 import type * as cash from "../cash.js";
 import type * as chat from "../chat.js";
 import type * as companies from "../companies.js";
@@ -204,6 +206,7 @@ declare const fullApi: ApiFromModules<{
   admin: typeof admin;
   agent: typeof agent;
   agentTools: typeof agentTools;
+  agentToolsCapital: typeof agentToolsCapital;
   agentToolsDebt: typeof agentToolsDebt;
   agentToolsDocuments: typeof agentToolsDocuments;
   agentToolsForecasts: typeof agentToolsForecasts;
@@ -221,6 +224,7 @@ declare const fullApi: ApiFromModules<{
   attioSync: typeof attioSync;
   auth: typeof auth;
   capitalEvents: typeof capitalEvents;
+  capitalEventsExtract: typeof capitalEventsExtract;
   cash: typeof cash;
   chat: typeof chat;
   companies: typeof companies;

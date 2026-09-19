@@ -1236,6 +1236,13 @@ export default defineSchema({
     documentId: v.optional(v.id('documents')),
     notes: v.optional(v.string()),
     createdBy: v.optional(v.id('users')),
+    // Absent = confirmed (a hand-entered or confirmed row). `proposed` = read
+    // from a legal document by convex/capitalEventsExtract.ts, waiting for a
+    // click; `rejected` = refused, kept as the memory that stops the same
+    // operation from being proposed again. Only confirmed rows count.
+    status: v.optional(v.union(v.literal('proposed'), v.literal('rejected'))),
+    // The verbatim quotes (date, price, count) that back a proposal.
+    evidence: v.optional(v.string()),
   })
     .index('by_company_asof', ['companyId', 'asOf'])
     .index('by_document', ['documentId']),

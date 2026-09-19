@@ -2437,6 +2437,25 @@ citer un document source (`documentId`) : `documents:remove` et
 (`document_cited_by_capital_event`, `company_has_references`), comme pour
 toute table qui référence une assiette existante.
 
+**Les propositions lues dans les documents (lot 2)** vivent dans la même
+table avec `status: 'proposed'`, et un refus les garde en `'rejected'`,
+invisibles : c'est la **mémoire** de l'extracteur
+(`convex/capitalEventsExtract.ts`), qui ne re-propose jamais une opération
+connue à ±7 jours au même prix, quel que soit son statut, et ne relit jamais
+un document déjà cité par une ligne. Supprimer une ligne refusée rend donc la
+proposition possible à la prochaine lecture — c'est voulu. Trois pièges :
+la lecture est chaînée **après** la classification automatique
+(`documentsClassify.apply`) et après un reclassement humain
+(`documents.update`), jamais après l'OCR seul, parce que le type conditionne
+la lecture ; le tour d'entrée est reconnu par la **date de closing du deal
+±60 jours et le même prix** (`convex/lib/capitalExtraction.ts`), donc un deal
+sans `closingDate` ni `signedDate` ni `pricePerShare` laisse passer son propre
+tour en proposition — renseigner le deal d'abord ; et le module qui lit
+(`capitalEventsExtract.ts`) ne doit **pas** être importé par `documents.ts`
+ou `documentsClassify.ts` pour ses constantes, sous peine de boucler les
+types de `_generated/api` (tout `api` devient `any`) — les constantes
+partagées vivent dans `convex/lib/capitalExtraction.ts`.
+
 ## Backfill depuis la doc juridique — 5 pièges
 
 `scripts/backfill-deal-fields.mjs` + `convex/migrations/alboDocBackfill.ts`

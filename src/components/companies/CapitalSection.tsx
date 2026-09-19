@@ -75,6 +75,8 @@ export function CapitalSection({
     companyId: company._id,
   })
   const removeEvent = useConvexMutation(api.capitalEvents.remove)
+  const confirmEvent = useConvexMutation(api.capitalEvents.confirm)
+  const rejectEvent = useConvexMutation(api.capitalEvents.reject)
   const [adding, setAdding] = useState(false)
   const [deleteId, setDeleteId] = useState<Id<'capitalEvents'> | null>(null)
 
@@ -98,14 +100,16 @@ export function CapitalSection({
           ownershipBps: d.ownershipPct ?? null,
           costCents: d.paidActual > 0 ? d.paidActual : (d.committedAmount ?? 0),
         })),
-        (events ?? []).map((e) => ({
-          eventId: e._id,
-          asOf: e.asOf,
-          kind: e.kind,
-          pricePerShareCents: e.pricePerShare,
-          sharesIssued: e.sharesIssued,
-          totalSharesAfter: e.totalSharesAfter,
-        })),
+        (events ?? [])
+          .filter((e) => e.status === null)
+          .map((e) => ({
+            eventId: e._id,
+            asOf: e.asOf,
+            kind: e.kind,
+            pricePerShareCents: e.pricePerShare,
+            sharesIssued: e.sharesIssued,
+            totalSharesAfter: e.totalSharesAfter,
+          })),
         company.totalShares ?? null,
       ),
     [shareDeals, events, company.totalShares],
@@ -137,6 +141,31 @@ export function CapitalSection({
       toast.error(t('participations:capital.errors.default'))
     } finally {
       setDeleteId(null)
+    }
+  }
+
+  // Read from a legal document, waiting for a click: shown after the
+  // confirmed rows, never part of the position until confirmed.
+  const proposals = (events ?? []).filter((e) => e.status === 'proposed')
+
+  async function decide(eventId: Id<'capitalEvents'>, accept: boolean) {
+    try {
+      if (accept) await confirmEvent({ eventId })
+      else await rejectEvent({ eventId })
+      toast.success(
+        t(
+          accept
+            ? 'participations:capital.confirmed'
+            : 'participations:capital.rejected',
+        ),
+      )
+    } catch (err) {
+      const code = err instanceof ConvexError ? String(err.data) : ''
+      toast.error(
+        t(`participations:capital.errors.${code}`, {
+          defaultValue: t('participations:capital.errors.default'),
+        }),
+      )
     }
   }
 
@@ -288,6 +317,59 @@ export function CapitalSection({
                         <Trash2 className="size-4" />
                       </Button>
                     )}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {proposals.map((e) => (
+                <TableRow key={`proposal:${e._id}`} className="bg-muted/40">
+                  <TableCell>{fmtDate(e.asOf)}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {t(`participations:capital.kind.${e.kind}`)}
+                      <Badge variant="secondary">
+                        {t('participations:capital.proposed')}
+                      </Badge>
+                    </div>
+                    {e.evidence && (
+                      <p
+                        className="text-muted-foreground mt-1 max-w-[28rem] truncate text-xs font-normal"
+                        title={e.evidence}
+                      >
+                        {e.evidence}
+                      </p>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtEurCents(e.pricePerShare)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtShares(e.sharesIssued)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtShares(e.totalSharesAfter)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {fmtEur(e.totalSharesAfter * e.pricePerShare)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground max-w-[14rem] truncate">
+                    {e.document?.title ?? '—'}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        onClick={() => void decide(e._id, true)}
+                      >
+                        {t('participations:capital.confirm')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => void decide(e._id, false)}
+                      >
+                        {t('participations:capital.reject')}
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

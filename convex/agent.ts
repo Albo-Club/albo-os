@@ -3,6 +3,7 @@ import { Agent, stepCountIs } from '@convex-dev/agent'
 
 import { components } from './_generated/api'
 import { dealTools } from './agentTools'
+import { capitalTools } from './agentToolsCapital'
 import { documentTools } from './agentToolsDocuments'
 import { forecastTools } from './agentToolsForecasts'
 import { debtTools } from './agentToolsDebt'
@@ -41,6 +42,7 @@ export const chatAgent = new Agent(components.agent, {
     ...debtTools,
     ...forecastTools,
     ...valuationTools,
+    ...capitalTools,
     ...projectionTools,
     ...reportTools,
     ...documentTools,

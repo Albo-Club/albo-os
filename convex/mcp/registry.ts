@@ -24,6 +24,7 @@ import { z } from 'zod'
 
 import { internal } from '../_generated/api'
 import { isTreasuryPlacement } from '../lib/instrumentMapping'
+import { CAPITAL_EVENT_KINDS } from '../lib/capitalPosition'
 import { FUND_TYPES, INSTRUMENTS, ROUND_TYPES } from '../lib/instruments'
 import {
   getProductDoc,
@@ -1340,6 +1341,66 @@ export const mcpTools: Array<McpTool> = [
         },
       )
       return { _id: created._id, url: appUrl(org, 'participations') }
+    },
+  }),
+  defineTool({
+    name: 'listCapitalEvents',
+    description:
+      'List the operations on the share capital of a portfolio company ' +
+      'after our entry (rounds, BSA exercises, conversions, secondaries), ' +
+      'oldest first. status: null = confirmed, "proposed" = read from a ' +
+      'legal document and waiting for a click on the sheet. Our own entry ' +
+      'round is NOT a row — it lives on the deal (getDeal). Amounts in ' +
+      'CENTS EUR. Find ids via listCompanies.',
+    schema: { org: orgSlug, companyId: z.string() },
+    run: async (ctx, actorUserId, { org, companyId }) =>
+      await ctx.runQuery(internal.capitalEvents.listInternal, {
+        orgId: await orgIdFor(ctx, actorUserId, org),
+        actorUserId,
+        companyId: companyId as Id<'companies'>,
+      }),
+  }),
+  defineTool({
+    name: 'addCapitalEvent',
+    description:
+      'Record a CONFIRMED operation on the share capital of a portfolio ' +
+      'company: the next round, a BSA exercise, a conversion, a secondary, ' +
+      'a capital reduction — never our own entry round (that is the deal). ' +
+      'pricePerShareCents in CENTS EUR (80 € → 8000); totalSharesAfter = ' +
+      'shares outstanding after the operation, the post-money is derived. ' +
+      'Find ids via listCompanies, history via listCapitalEvents.',
+    schema: {
+      org: orgSlug,
+      companyId: z.string(),
+      asOf: z.string().describe('ISO date "YYYY-MM-DD"'),
+      kind: z.enum(CAPITAL_EVENT_KINDS),
+      pricePerShareCents: z.number().int().positive(),
+      sharesIssued: z.number().int().nonnegative().optional(),
+      totalSharesAfter: z.number().int().positive(),
+      roundSizeCents: z.number().int().nonnegative().optional(),
+      roundType: z.enum(ROUND_TYPES).optional(),
+      notes: z.string().optional(),
+    },
+    write: true,
+    run: async (
+      ctx,
+      actorUserId,
+      { org, companyId, asOf, pricePerShareCents, roundSizeCents, ...fields },
+    ) => {
+      const orgId = await orgIdFor(ctx, actorUserId, org)
+      const created = await ctx.runMutation(
+        internal.capitalEvents.createInternal,
+        {
+          orgId,
+          actorUserId,
+          companyId: companyId as Id<'companies'>,
+          asOf: parseISODate(asOf),
+          pricePerShare: pricePerShareCents,
+          roundSize: roundSizeCents,
+          ...fields,
+        },
+      )
+      return { _id: created._id, url: companyUrl(org, companyId) }
     },
   }),
 ]

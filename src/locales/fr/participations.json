@@ -655,7 +655,13 @@
     "deleted": "Opération retirée",
     "deleteConfirmTitle": "Retirer cette opération ?",
     "deleteConfirmDescription": "La frise et la valorisation actuelle seront recalculées sans elle.",
+    "proposed": "Proposée",
+    "confirm": "Confirmer",
+    "reject": "Refuser",
+    "confirmed": "Opération confirmée",
+    "rejected": "Proposition refusée",
     "errors": {
+      "not_proposed": "Cette opération n'est plus une proposition.",
       "invalid_price": "Le prix par action doit être un montant positif.",
       "invalid_shares": "Le nombre d'actions doit être un entier positif.",
       "invalid_amount": "Le montant levé doit être positif.",
