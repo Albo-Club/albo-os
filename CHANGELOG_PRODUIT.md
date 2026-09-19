@@ -23,6 +23,30 @@ bas de page.
 
 ---
 
+## v1.250.2 — 19/09/2026 à 15:21 — Ménage : le backend de l'ancien tableau de bord s'en va
+
+Rien ne change dans l'application. Le calcul qui alimentait l'ancien tableau
+de bord, page retirée il y a plusieurs mois, vivait encore dans le code sans
+que rien ne l'appelle. Il est supprimé.
+
+> **🔧 Notes techniques**
+>
+> - Suppression de `convex/dashboard.ts` (229 lignes, la query `getDashboard`)
+>   et de rien d'autre : aucun appelant côté front, Convex ou tests, et
+>   aucune table associée — le module ne faisait que lire `deals`,
+>   `transactions`, `valuations` et `bankAccounts` pour tout recalculer.
+> - Correction d'une affirmation fausse de `TESTING.md` qui présentait ce
+>   module comme le backend de `getDashboardSummary` : cet outil vit dans
+>   `convex/agentTools.ts` et n'a jamais rien pris ici. C'est probablement
+>   cette phrase qui a fait croire le fichier vivant.
+> - Le module portait encore le bug corrigé en v1.250.0 (il comptait les
+>   `lead_spv` dans le déployé, le distribué et la NAV) : le supprimer vaut
+>   mieux que corriger du code que personne n'exécute.
+> - La leçon de perf qu'il documentait est reprise dans `KNOWN_ISSUES.md`
+>   § « Agrégats de portefeuille : lire par deal, jamais toute la table » —
+>   un `.collect()` de toute la table `transactions` rendait la page lente,
+>   d'où les lectures indexées par deal. Les deux commentaires de
+>   `agentTools.ts` qui pointaient vers le fichier renvoient désormais là.
 ## v1.250.1 — 19/09/2026 à 15:05 — La reprise des opérations sur le capital attend ses lectures
 
 Correctif technique : la reprise de l'historique des documents juridiques (lancée une fois après la v1.249.0) rendait la main avant d'avoir fini d'enregistrer ses lectures, si bien qu'une partie des analyses pouvait ne jamais démarrer sans que rien ne le signale. Elle attend désormais que chaque lecture soit bien planifiée avant de conclure. La commande est à relancer une fois ; les documents déjà lus avec succès sont sautés.

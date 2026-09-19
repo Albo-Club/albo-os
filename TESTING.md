@@ -284,8 +284,10 @@ la fiche deal complète.
 ## Niveau 3 — Prévisionnel de trésorerie (10 min)
 
 > Le tableau de bord (`/app/<org>`) est supprimé : l'URL redirige vers la
-> liste Entreprises (cf. SH5). Le backend `convex/dashboard.ts` reste servi
-> à l'agent IA / MCP (`getDashboardSummary`).
+> liste Entreprises (cf. SH5). Son backend `convex/dashboard.ts` a été
+> supprimé avec lui — il n'était appelé par personne. L'outil
+> `getDashboardSummary` de l'agent IA / MCP ne venait pas de là et reste
+> servi par `convex/agentTools.ts`.
 
 | #   | Étape                                                                 | Résultat attendu                                                                                                                                                                                                                                                               |
 | --- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
