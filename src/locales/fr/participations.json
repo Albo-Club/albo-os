@@ -961,6 +961,7 @@
     "title": "Valorisation",
     "adjust": "Ajuster",
     "empty": "Aucune valorisation : la ligne vaut ce qui a été versé. Un tour confirmé dans « Capital et valorisation » ou un ajustement manuel la fixe.",
+    "emptyManual": "Aucune valorisation : la ligne vaut ce qui a été versé. Le bouton « Ajuster » fixe sa valeur à la main.",
     "col": {
       "date": "Date",
       "fairValue": "Valeur de la ligne",

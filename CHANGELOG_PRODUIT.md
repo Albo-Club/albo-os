@@ -23,6 +23,18 @@ bas de page.
 
 ---
 
+## v1.252.0 — 19/09/2026 à 16:52 — Déprécier un BSA AIR ou une obligation convertible
+
+La section « Valorisation » de la fiche deal, jusqu'ici réservée aux lignes en actions, s'ouvre aux **BSA AIR**, aux **obligations convertibles** et aux **convertible notes**. On y lit l'historique des valorisations et on **ajuste** la valeur à la main — une dépréciation ou une valorisation manuelle, datée — exactement comme sur une ligne en actions. C'est la valeur que reprennent ensuite le TVPI de la liste des participations, la marge des nantissements et l'assistant IA.
+
+Différence à garder en tête : un tour confirmé dans « Capital et valorisation » ne valorise que les **actions détenues**. Sur un titre non encore converti, la section n'attend donc que les ajustements manuels, et le dit quand elle est vide.
+
+> **🔧 Notes techniques**
+>
+> - `src/components/deals/ValuationSection.tsx` : le composant prend `instrumentKind` et exporte `showsValuationSection()` (`share`, `bsa_air`, `oc`, `convertible_note`), lu par `deals.$dealId.tsx` à la place du test `=== 'share'`. `CAPITAL_DERIVED_KINDS` (shares seules) choisit la copie de l'état vide.
+> - Aucun changement backend : `valuations.create` / `list` ne filtrent pas par instrument, et `capitalEvents.deriveValuations` continue de ne dériver que sur les deals `share`.
+> - Libellé `participations:valuation.emptyManual` (en/fr). Vérifié qu'aucun autre panneau de la fiche ne montre déjà une valorisation pour ces trois types (`CUSTOM_PANELS` ne couvre que `lead_spv` et `royalty`, `fund_lp` garde sa `FundSection`).
+
 ## v1.251.0 — 19/09/2026 à 15:50 — Un tour confirmé valorise la ligne
 
 Un tour de table confirmé dans « Capital et valorisation » fixe désormais la valeur de nos lignes en actions dans la société : titres détenus × nouveau prix, à la date du tour. Cette valeur devient la valorisation courante du deal — celle que lisent le TVPI de la liste des participations, la marge des nantissements et l'assistant IA. Supprimer l'opération ramène la valorisation d'avant. Un deal sans nombre d'actions renseigné, déjà sorti, ou entré après le tour n'est pas touché.

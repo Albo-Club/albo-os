@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 
 import { api } from '../../../convex/_generated/api'
 import type { Id } from '../../../convex/_generated/dataModel'
+import type { InstrumentKind } from '../../../convex/lib/instruments'
 import { useFormatters } from '~/components/participations/ParticipationsTable'
 import { AmountInput } from '~/components/ui/amount-input'
 import { Button } from '~/components/ui/button'
@@ -43,12 +44,40 @@ const MANUAL_METHODS = ['impairment', 'manual'] as const
 type ManualMethod = (typeof MANUAL_METHODS)[number]
 
 /**
- * « Valorisation » of a share deal: the valuation history that feeds its
- * TVPI — rows derived from confirmed capital operations (company sheet),
- * imports, and the manual adjustments entered here (an impairment is just a
- * later row, and wins until the next confirmed round).
+ * Instrument kinds whose deal sheet carries the « Valorisation » section.
+ * Shares are valued by the capital operations of the company sheet; the
+ * three convertible kinds are valued by hand only (a capital operation
+ * moves the shares we HOLD, which these instruments are not yet). Other
+ * kinds either have their own panel (fund_lp, royalty, lead_spv) or no
+ * notion of a fair value to correct.
  */
-export function ValuationSection({ dealId }: { dealId: Id<'deals'> }) {
+const VALUATION_SECTION_KINDS = new Set<InstrumentKind>([
+  'share',
+  'bsa_air',
+  'oc',
+  'convertible_note',
+])
+
+/** Only shares get valuation rows derived from the capital operations. */
+const CAPITAL_DERIVED_KINDS = new Set<InstrumentKind>(['share'])
+
+export function showsValuationSection(kind: InstrumentKind): boolean {
+  return VALUATION_SECTION_KINDS.has(kind)
+}
+
+/**
+ * « Valorisation » of a deal: the valuation history that feeds its TVPI —
+ * rows derived from confirmed capital operations (company sheet, shares
+ * only), imports, and the manual adjustments entered here (an impairment is
+ * just a later row, and wins until the next confirmed round).
+ */
+export function ValuationSection({
+  dealId,
+  instrumentKind,
+}: {
+  dealId: Id<'deals'>
+  instrumentKind: InstrumentKind
+}) {
   const { t } = useTranslation(['participations', 'common'])
   const { fmtEur, fmtDate } = useFormatters()
   const valuations = useConvexQuery(api.valuations.list, { dealId })
@@ -77,7 +106,11 @@ export function ValuationSection({ dealId }: { dealId: Id<'deals'> }) {
         <LoadingLine>{t('participations:loading')}</LoadingLine>
       ) : valuations.length === 0 ? (
         <div className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">
-          {t('participations:valuation.empty')}
+          {t(
+            CAPITAL_DERIVED_KINDS.has(instrumentKind)
+              ? 'participations:valuation.empty'
+              : 'participations:valuation.emptyManual',
+          )}
         </div>
       ) : (
         <div className="rounded-lg border">

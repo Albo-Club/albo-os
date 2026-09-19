@@ -961,6 +961,7 @@
     "title": "Valuation",
     "adjust": "Adjust",
     "empty": "No valuation yet: the line is worth what was paid. A round confirmed under “Capital and valuation” or a manual adjustment sets it.",
+    "emptyManual": "No valuation yet: the line is worth what was paid. The “Adjust” button sets its value by hand.",
     "col": {
       "date": "Date",
       "fairValue": "Line value",
