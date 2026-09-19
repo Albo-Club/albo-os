@@ -23,7 +23,7 @@ bas de page.
 
 ---
 
-## v1.249.0 — 19/09/2026 à 12:35 — Piloter un SPV rapporte, ce n'est pas investir
+## v1.250.0 — 19/09/2026 à 13:06 — Piloter un SPV rapporte, ce n'est pas investir
 
 Quand une société du groupe pilote un SPV pour d'autres investisseurs, elle
 encaisse des frais de gestion et du carried. Ces revenus étaient jusqu'ici
@@ -74,6 +74,52 @@ métriques.
 >   quitte l'archétype `management` fait rougir la CI), et
 >   `convex/regression.performanceDeals.test.ts` rejoue le cas Hectarea de
 >   bout en bout sur les quatre surfaces.
+## v1.249.0 — 19/09/2026 à 12:35 — Les documents juridiques proposent les opérations sur le capital
+
+Quand un pacte, un bulletin de souscription ou un PV est déposé sur une
+participation détenue en actions, l'app le lit et **propose** les opérations
+sur le capital qu'il décrit : tour suivant, exercice de BSA, conversion,
+secondaire. La proposition apparaît dans la section « Capital et
+valorisation », marquée « Proposée », avec l'extrait du texte qui la justifie.
+Un clic sur **Confirmer** en fait une opération comme les autres, inscrite
+dans l'Activité à votre nom ; **Refuser** la fait disparaître, et le même tour
+ne sera pas re-proposé au prochain dépôt. Notre propre tour d'entrée n'est
+jamais proposé : c'est le deal. Reclasser un document « Autre » en PV, pacte
+ou bulletin déclenche la même lecture.
+
+L'assistant IA et le serveur MCP savent lister les opérations d'une société,
+en ajouter une et (côté assistant) confirmer une proposition, avec votre
+accord à chaque écriture. Une reprise sur les documents déjà déposés de
+l'org Albo est prête à lancer.
+
+> **🔧 Notes techniques**
+>
+> - `capitalEvents.status` (`proposed` / `rejected`, absent = confirmé) +
+>   `evidence`. `convex/capitalEvents.ts` : `confirm`, `reject`, internals
+>   `listInternal` / `createInternal` / `confirmInternal` (`readMembership`,
+>   `viaAgent`). Seule la confirmation est journalisée ; `applyProposals` et
+>   `reject` sont exemptés dans `tests/journalGuards.test.ts`.
+> - `convex/capitalEventsExtract.ts` : `getTarget` (document legal/pacte/
+>   subscription d'une société portfolio à deal actions, non cité, texte
+>   présent), `run` (`generateObject`, schéma d'opérations citées, prompt
+>   juriste), `applyProposals` (dédup rejouée à l'écriture), `backfillAlbo` +
+>   `listReplayTargets` (reprise cadencée, idempotente).
+> - `convex/lib/capitalExtraction.ts` (pur) : `planProposals` — extrait
+>   verbatim exigé, tour d'entrée exclu (closing ±60 j, même prix), doublon
+>   exclu (±7 j, même prix), `CAPITAL_SOURCE_KINDS` partagé.
+> - Déclencheurs : `documentsClassify.apply` (ancre société, type source) et
+>   `documents.update` (type changé vers un type source).
+> - Façades IA : `convex/agentToolsCapital.ts` (`listCapitalEvents`,
+>   `addCapitalEvent`, `confirmCapitalEvent`, `needsApproval` sur les
+>   écritures) enregistré dans `agent.ts` ; MCP `listCapitalEvents` +
+>   `addCapitalEvent` (`write: true`).
+> - Front : lignes « Proposée » dans `CapitalSection.tsx` avec Confirmer /
+>   Refuser et extrait ; libellés `capital.*`.
+> - Tests : `tests/capitalExtraction.test.ts`, lot 2 de
+>   `convex/regression.capitalEvents.test.ts` (propositions, cible, déclencheurs
+>   via `_scheduled_functions`, façades). Runbook dans `MIGRATIONS.md`.
+
+---
 
 ## v1.248.0 — 19/09/2026 à 11:45 — Capital et valorisation : l'entrée face à aujourd'hui sur la fiche société
 

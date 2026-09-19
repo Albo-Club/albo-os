@@ -25,6 +25,7 @@ import { requireOrgMember } from './lib/auth'
 import { requireGuaranteeParty } from './guarantees'
 import { releaseStorage } from './lib/documentBlobs'
 import { logCompanyEvent, logDealEvent, userActor } from './lib/companyEvents'
+import { CAPITAL_SOURCE_KINDS } from './lib/capitalExtraction'
 import { sourceInbound } from './lib/reportSource'
 
 import type { Id } from './_generated/dataModel'
@@ -482,6 +483,18 @@ export const update = mutation({
 
     if (trimmed !== doc.title || kind !== doc.kind) {
       await ctx.scheduler.runAfter(0, internal.vectorize.indexDocument, {
+        documentId,
+      })
+    }
+    // A human filing the document as a pacte, a bulletin or a PV is the
+    // same signal as the automatic classification: read the operations on
+    // the capital it describes (proposals only).
+    if (
+      kind !== doc.kind &&
+      CAPITAL_SOURCE_KINDS.has(kind) &&
+      (doc.companyId || doc.dealId)
+    ) {
+      await ctx.scheduler.runAfter(0, internal.capitalEventsExtract.run, {
         documentId,
       })
     }

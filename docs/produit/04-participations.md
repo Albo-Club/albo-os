@@ -162,7 +162,19 @@ La colonne principale, dans l'ordre de lecture :
   n'est jamais saisi : il se déduit des actions totales et du prix. Un
   dernier prix **sous** le prix d'entrée affiche un badge **Down round**.
   Tant qu'aucune opération n'est saisie, « aujourd'hui » vaut « à
-  l'entrée » et la section le dit. Cette valorisation est **informative**
+  l'entrée » et la section le dit. **Les documents nourrissent la frise** :
+  quand un pacte, un bulletin ou un PV est déposé sur la société (ou qu'un
+  document existant est reclassé dans l'un de ces types), l'app le lit et
+  **propose** les opérations qu'il décrit, chacune avec l'extrait du texte
+  qui la justifie. Une proposition apparaît en fin de frise, marquée
+  « Proposée », avec **Confirmer** et **Refuser** : confirmée, elle compte
+  comme une opération saisie à la main et s'inscrit dans l'Activité au nom
+  de qui l'a confirmée ; refusée, elle disparaît et ne sera pas re-proposée
+  au prochain dépôt. Notre propre tour d'entrée n'est jamais proposé (c'est
+  le deal), et une opération déjà connue à quelques jours près, au même prix,
+  n'est pas proposée deux fois. L'assistant IA sait lister les opérations
+  d'une société, en ajouter une et confirmer une proposition, avec votre
+  accord à chaque écriture. Cette valorisation est **informative**
   dans un premier temps : elle n'alimente pas encore le TVPI ni la NAV du
   portefeuille, et la fiche deal comme le pourcentage de l'en-tête restent
   ce qu'ils sont. Un document cité comme source d'une opération ne peut

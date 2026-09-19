@@ -79,6 +79,13 @@ const EXEMPT: Record<string, string> = {
     'expires OCR reads that never came back',
   'documentsClassify.ts#apply':
     'automatic kind on a fresh upload — the add event already names the filing',
+  // Capital operations read from a legal document: a proposal is not a
+  // gesture and a refusal only files it away — the confirmation is the
+  // journaled gesture (capitalEvents.ts#confirm).
+  'capitalEventsExtract.ts#applyProposals':
+    'proposed capital operations, journaled when a human confirms them',
+  'capitalEvents.ts#reject':
+    'a refused proposal is kept hidden as the anti-repeat memory, nothing to show',
 }
 
 /** Directories whose files never run against prod data on a user's behalf. */
